@@ -25,7 +25,11 @@ export async function GET(request: Request) {
         if (country === "Brazil") baseYield = 4.0;
 
         // Generate History (Last 5 Years)
-        const history = [];
+        interface DataPoint {
+            year: number;
+            yield: number;
+        }
+        const history: DataPoint[] = [];
         for (let i = 5; i > 0; i--) {
             const year = currentYear - i;
             // Random fluctuation ±10%
@@ -40,7 +44,7 @@ export async function GET(request: Request) {
         }
 
         // Generate Forecast (Next 3 Years)
-        const forecast = [];
+        const forecast: DataPoint[] = [];
         const lastYield = history[history.length - 1].yield;
 
         for (let i = 0; i < 3; i++) {
