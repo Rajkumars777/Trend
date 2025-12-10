@@ -20,6 +20,7 @@ try:
     from utils.ai_client import AgriAIClient
     from utils.agri_keywords import ALL_KEYWORDS
     from utils.logger import PipelineLogger
+    from utils.world_bank import WorldBankClient
 except ImportError:
     print("❌ Error: Could not import utils. Make sure 'scripts/utils' exists.")
     sys.exit(1)
@@ -37,6 +38,7 @@ print(f"🔌 Connecting to MongoDB...")
 client = pymongo.MongoClient(MONGO_URI)
 db = client.get_database('agri_trend_dashboard')
 ai_client = AgriAIClient()
+wb_client = WorldBankClient()
 
 # ==========================================
 # PART 1: DATA FETCHING
