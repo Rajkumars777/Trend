@@ -273,7 +273,7 @@ export async function GET() {
             }),
             wordCloud: wordCloud
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error("API Error (Trends):", error);
         return NextResponse.json({
             trends: [], sentimentDist: [], topCrop: "N/A", forecastIndex: "Stable",
@@ -281,8 +281,8 @@ export async function GET() {
             predictions: [],
             sentimentByPlatform: [],
             sentimentByCategory: [],
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined
-        });
+            error: error.message || String(error),
+            dbError: true // Flag to indicate detailed backend failure
+        }, { status: 500 });
     }
 }

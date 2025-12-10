@@ -39,8 +39,13 @@ async function dbConnect() {
       dbName: 'agri_trend_dashboard',
     };
 
+    console.log("Attempting to connect to MongoDB...");
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
+      console.log("MongoDB Connected Successfully");
       return mongoose.connection;
+    }).catch(err => {
+      console.error("MongoDB Connection Failed:", err);
+      throw err;
     });
   }
 
@@ -48,6 +53,7 @@ async function dbConnect() {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
+    console.error("Error awaiting MongoDB connection promise:", e);
     throw e;
   }
 

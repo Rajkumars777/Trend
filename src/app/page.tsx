@@ -31,6 +31,7 @@ export default function Dashboard() {
     influencers: [],
     commodities: []
   });
+  const [sysError, setSysError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -42,6 +43,12 @@ export default function Dashboard() {
 
         const result = await trendsRes.json();
         const priceResult = await pricesRes.json();
+
+        if (result.error || result.dbError) {
+          setSysError(`System Error: ${result.error || "Database connection failed"}`);
+        } else {
+          setSysError(null);
+        }
 
         // Ensure all arrays are initialized to avoid undefined errors
         setData({
@@ -55,10 +62,19 @@ export default function Dashboard() {
         });
       } catch (e) {
         console.error("Failed to fetch dashboard data", e);
+        setSysError("Failed to connect to the server. Please check your internet connection.");
       }
     }
     fetchData();
   }, []);
+
+  // Update check for specific API errors
+  useEffect(() => {
+    // We can also check effectively if data is empty despite no throw
+    if (data.trends.length === 0 && !sysError) {
+      // Optional: Add logic here if we detect empty data but no explicit error
+    }
+  }, [data, sysError]);
 
   // Aggregations for TopStatsRow
   // Global Counts from sentimentDist
@@ -92,6 +108,14 @@ export default function Dashboard() {
     <div className="space-y-4">
       {/* Live Header with Clock & Weather */}
       <LiveHeader />
+
+      {/* System Error Alert */}
+      {sysError && (
+        <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-xl flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5" />
+          <span className="font-semibold">{sysError}</span>
+        </div>
+      )}
 
       {/* Scrolling News Ticker */}
       <NewsTicker headlines={data.recentPosts
