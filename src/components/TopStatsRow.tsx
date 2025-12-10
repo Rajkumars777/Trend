@@ -37,7 +37,7 @@ export default function TopStatsRow({
     );
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             {/* 1. Total Records */}
             <div className="bg-card/60 backdrop-blur-xl border border-white/5 p-4 rounded-3xl flex flex-col justify-between shadow-lg hover:shadow-blue-500/10 hover:border-blue-500/30 transition-all duration-300 group relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-[0.05] group-hover:opacity-[0.1] transition-opacity scale-125">

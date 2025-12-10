@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
-import { scaleLinear } from 'd3-scale';
+import { scaleLinear } from "d3-scale";
+import clsx from "clsx";
 import { Tooltip as ReactTooltip } from 'react-tooltip';
 import { AlertTriangle } from 'lucide-react';
 
@@ -37,7 +38,7 @@ export default function GlobalMap({ className, onCountrySelect }: GlobalMapProps
         .range(["#3b82f6", "#e2e8f0", "#ef4444"]);
 
     return (
-        <div className={`bg-card border border-border rounded-xl p-6 shadow-sm relative flex flex-col ${className || 'flex-1 min-h-[400px]'}`}>
+        <div className={clsx("bg-card/50 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-lg flex flex-col relative overflow-hidden h-full min-h-[350px] md:min-h-[500px]", className)}>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-foreground">Global Activity Heatmap</h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
@@ -106,7 +107,7 @@ export default function GlobalMap({ className, onCountrySelect }: GlobalMapProps
                     const isMissing = info.isMissing;
 
                     return (
-                        <div className="absolute top-4 right-4 w-72 bg-card/95 backdrop-blur-md border border-border p-0 rounded-xl shadow-2xl z-20 animate-in fade-in slide-in-from-top-4 duration-300 overflow-hidden ring-1 ring-black/5 pointer-events-none">
+                        <div className="absolute bottom-4 left-4 right-4 max-h-[60%] overflow-y-auto custom-scrollbar md:max-h-none md:overflow-visible md:top-4 md:right-4 md:left-auto md:bottom-auto md:w-72 bg-card/95 backdrop-blur-md border border-border p-0 rounded-xl shadow-2xl z-20 animate-in fade-in slide-in-from-bottom-4 md:slide-in-from-top-4 duration-300 ring-1 ring-black/5 pointer-events-auto">
                             {/* Header */}
                             <div className="p-4 border-b border-border/50 bg-muted/20 flex justify-between items-start">
                                 <div>

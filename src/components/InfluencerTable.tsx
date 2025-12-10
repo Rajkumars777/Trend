@@ -28,8 +28,8 @@ export default function InfluencerTable({ influencers = INFLUENCERS }: { influen
 
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar relative z-10">
-                <table className="w-full text-left">
+            <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full min-w-[600px] text-left">
                     <thead>
                         <tr className="text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
                             <th className="py-2">Rank</th>

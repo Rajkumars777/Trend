@@ -12,19 +12,19 @@ export default function NewsTicker({ headlines = [] }: NewsTickerProps) {
     }
 
     return (
-        <div className="bg-gradient-to-r from-red-600/10 via-background to-background border-y border-red-500/20 py-3 mb-8 overflow-hidden flex items-center relative backdrop-blur-sm">
-            <div className="absolute left-0 top-0 bottom-0 bg-card z-30 px-6 flex items-center gap-3 border-r border-red-500/20 shadow-[10px_0_30px_rgba(0,0,0,0.1)]">
+        <div className="bg-gradient-to-r from-red-600/10 via-background to-background border-y border-red-500/20 py-2 md:py-3 mb-6 md:mb-8 overflow-hidden flex items-center relative backdrop-blur-sm">
+            <div className="absolute left-0 top-0 bottom-0 bg-card z-30 px-3 md:px-6 flex items-center gap-3 border-r border-red-500/20 shadow-[10px_0_30px_rgba(0,0,0,0.1)]">
                 <div className="relative">
                     <span className="absolute -inset-1 rounded-full bg-red-500/20 animate-ping"></span>
-                    <Megaphone size={18} className="text-red-500 relative z-10" />
+                    <Megaphone size={16} className="text-red-500 relative z-10 md:w-[18px] md:h-[18px]" />
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-xs font-black text-red-500 uppercase tracking-[0.2em]">Breaking</span>
-                    <span className="text-[10px] font-medium text-neutral">Live Feed</span>
+                    <span className="text-[10px] md:text-xs font-black text-red-500 uppercase tracking-[0.2em]">Breaking</span>
+                    <span className="text-[8px] md:text-[10px] font-medium text-neutral hidden sm:inline-block">Live Feed</span>
                 </div>
             </div>
 
-            <div className="whitespace-nowrap animate-marquee flex gap-16 items-center pl-48">
+            <div className="whitespace-nowrap animate-marquee flex gap-12 md:gap-16 items-center pl-32 md:pl-48">
                 {[...headlines, ...headlines, ...headlines].map((headline, i) => ( // Triple content for smoother loop
                     <span key={i} className="text-sm text-foreground/90 font-medium flex items-center gap-3 group cursor-pointer hover:text-red-400 transition-colors">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500/50 group-hover:bg-red-500 group-hover:scale-150 transition-all"></span>
