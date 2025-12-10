@@ -19,11 +19,11 @@ export default function StatCard({ title, value, trend, trendUp, icon: Icon, col
     };
 
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-all duration-300 shadow-lg">
+        <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md">
             <div className="flex justify-between items-start">
                 <div>
-                    <p className="text-slate-400 text-sm font-medium mb-1">{title}</p>
-                    <h3 className="text-3xl font-bold text-white">{value}</h3>
+                    <p className="text-muted-foreground text-sm font-medium mb-1">{title}</p>
+                    <h3 className="text-3xl font-bold text-foreground">{value}</h3>
                 </div>
                 <div className={clsx('p-3 rounded-xl border', colorStyles[color])}>
                     <Icon size={24} />
@@ -31,10 +31,10 @@ export default function StatCard({ title, value, trend, trendUp, icon: Icon, col
             </div>
             {trend && (
                 <div className="mt-4 flex items-center gap-2">
-                    <span className={clsx('text-xs font-bold px-2 py-1 rounded-full', trendUp ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}>
+                    <span className={clsx('text-xs font-bold px-2 py-1 rounded-full', trendUp ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive')}>
                         {trend}
                     </span>
-                    <span className="text-slate-500 text-xs">vs last week</span>
+                    <span className="text-muted-foreground text-xs">vs last week</span>
                 </div>
             )}
         </div>

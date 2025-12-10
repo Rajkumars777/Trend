@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import PostFeed from '@/components/PostFeed';
 import SentimentAnalysis from '@/components/SentimentAnalysis';
+import SentimentPlatformDetails from '@/components/SentimentPlatformDetails';
 import { Loader2 } from 'lucide-react';
 
 export default function SentimentPage() {
@@ -11,6 +12,8 @@ export default function SentimentPage() {
         sentimentByPlatform: [],
         sentimentByCategory: []
     });
+
+    const [platformDetails, setPlatformDetails] = useState<any>(null);
 
     // Feed State
     const [posts, setPosts] = useState<any[]>([]);
@@ -23,6 +26,7 @@ export default function SentimentPage() {
     useEffect(() => {
         async function fetchStats() {
             try {
+                // Fetch Overview Stats
                 const trendsRes = await fetch('/api/trends');
                 const trendsData = await trendsRes.json();
                 setStats({
@@ -30,6 +34,12 @@ export default function SentimentPage() {
                     sentimentByPlatform: trendsData.sentimentByPlatform || [],
                     sentimentByCategory: trendsData.sentimentByCategory || []
                 });
+
+                // Fetch Detailed Platform Stats
+                const detailsRes = await fetch('/api/sentiment-details');
+                const detailsData = await detailsRes.json();
+                setPlatformDetails(detailsData);
+
             } catch (e) {
                 console.error("Failed to fetch stats", e);
             } finally {
@@ -58,7 +68,11 @@ export default function SentimentPage() {
                 setPosts(prev => [...prev, ...(data.posts || [])]);
             }
 
-            setHasMore(data.pagination.page < data.pagination.pages);
+            if (data.pagination) {
+                setHasMore(data.pagination.page < data.pagination.pages);
+            } else {
+                setHasMore(false);
+            }
         } catch (e) {
             console.error("Failed to fetch posts", e);
         } finally {
@@ -87,14 +101,14 @@ export default function SentimentPage() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 pb-10">
             <div>
-                <h2 className="text-3xl font-bold text-white">Voice of the Customer</h2>
-                <p className="text-slate-400 mt-2">Analyze farmer sentiment across different categories and platforms.</p>
+                <h2 className="text-3xl font-bold text-foreground">Voice of the Customer</h2>
+                <p className="text-neutral mt-2">Analyze farmer sentiment across different categories and platforms.</p>
             </div>
 
-            {/* Sentiment Analysis Widget */}
-            <div className="h-[500px]">
+            {/* Sentiment Overview Widget */}
+            <div className="min-h-[350px]">
                 <SentimentAnalysis
                     distData={stats.sentimentDist}
                     platformData={stats.sentimentByPlatform}
@@ -104,9 +118,17 @@ export default function SentimentPage() {
                 />
             </div>
 
+            {/* New: Detailed Platform Analysis */}
+            {platformDetails && (
+                <div className="animate-in slide-in-from-bottom-5 duration-700">
+                    <h3 className="text-xl font-bold text-foreground mb-4 border-l-4 border-primary pl-3">Platform-wise Deep Dive</h3>
+                    <SentimentPlatformDetails data={platformDetails} />
+                </div>
+            )}
+
             {/* Live Feed */}
             <div>
-                <h3 className="text-xl font-bold text-white mb-4">Live Discussion Feed</h3>
+                <h3 className="text-xl font-bold text-foreground mb-4">Live Discussion Feed</h3>
                 <PostFeed posts={posts} onLoadMore={handleLoadMore} hasMore={hasMore} />
             </div>
         </div>

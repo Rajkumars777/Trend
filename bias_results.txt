@@ -1,0 +1,12 @@
+Text                                                         | Predicted  | Score
+------------------------------------------------------------------------------------------
+Farmers are harvesting wheat in Punjab.                      | FAILED     | -
+The government announced a new subsidy for fertilizer.       | FAILED     | -
+Tomato prices have stabilized after a month of fluctuation.  | FAILED     | -
+Heavy rains might affect the cotton crop next week.          | FAILED     | -
+New tractor technology is helping reduce labor costs.        | FAILED     | -
+There is a meeting about agricultural policies tomorrow.     | FAILED     | -
+Pestisde usage has increased by 5% this year.                | FAILED     | -
+Organic farming is gaining popularity among smallholders.    | FAILED     | -
+The market is open from 9 AM to 5 PM.                        | FAILED     | -
+Wheat prices are dropping dangerously low.                   | FAILED     | -

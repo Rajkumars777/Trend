@@ -18,21 +18,41 @@ const TOPICS = [
     { text: 'Regenerative', value: 25, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
 ];
 
-export default function WordCloud() {
-    return (
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl p-6 shadow-xl h-full flex flex-col relative overflow-hidden group">
-            {/* Background Glow */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+// Helper to assign random/consistent colors if missing
+const STYLE_VARIANTS = [
+    { color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+    { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    { color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+    { color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+    { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+    { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+    { color: 'text-lime-400', bg: 'bg-lime-500/10', border: 'border-lime-500/20' },
+    { color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+    { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+];
 
+export default function WordCloud({ topics = TOPICS }: { topics?: any[] }) {
+    // Merge incoming topics with styles if they are missing
+    const displayTopics = (topics.length > 0 ? topics : TOPICS).map((topic, i) => {
+        if (topic.color) return topic; // Already has styles
+        // Assign style based on index
+        const style = STYLE_VARIANTS[i % STYLE_VARIANTS.length];
+        return { ...topic, ...style };
+    });
+
+    return (
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm h-full flex flex-col relative overflow-hidden group hover:shadow-md transition-all duration-300">
+            {/* Header */}
             <div className="flex items-center gap-2 mb-6 relative z-10">
-                <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
-                    <Hash size={20} className="text-emerald-400" />
+                <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                    <Hash size={20} className="text-primary" />
                 </div>
-                <h3 className="text-xl font-bold text-white">Topic Clustering</h3>
+                <h3 className="text-xl font-bold text-foreground">Topic Clustering</h3>
             </div>
 
             <div className="flex flex-wrap gap-3 justify-center items-center flex-1 content-center relative z-10">
-                {TOPICS.map((topic, i) => {
+                {displayTopics.map((topic, i) => {
                     // Dynamic sizing based on value
                     const fontSize = Math.max(0.75, topic.value / 35);
                     const padding = Math.max(0.5, topic.value / 200);

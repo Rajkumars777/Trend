@@ -3,89 +3,104 @@
 import { User, Twitter, MessageCircle, Trophy, TrendingUp, ExternalLink } from 'lucide-react';
 
 const INFLUENCERS = [
-    { name: 'AgriTech Daily', handle: '@agritech_daily', platform: 'Twitter', reach: '1.2M', sentiment: 'Positive', engagement: 92 },
-    { name: 'Farming Future', handle: '@farming_future', platform: 'Reddit', reach: '850K', sentiment: 'Neutral', engagement: 78 },
-    { name: 'Green Growth', handle: '@greengrowth', platform: 'Twitter', reach: '500K', sentiment: 'Very Positive', engagement: 88 },
-    { name: 'Crop Watch', handle: '@cropwatch_org', platform: 'Reddit', reach: '320K', sentiment: 'Negative', engagement: 65 },
-    { name: 'Sustainable Life', handle: '@sust_life', platform: 'Twitter', reach: '210K', sentiment: 'Positive', engagement: 72 },
+    { name: 'AgriTech Daily', handle: '@agritech_daily', platform: 'twitter', reach: '1.2M', sentiment: 'Positive', engagement: 92, profileUrl: 'https://twitter.com/agritech_daily' },
+    { name: 'Farming Future', handle: '@farming_future', platform: 'reddit', reach: '850K', sentiment: 'Neutral', engagement: 78, profileUrl: 'https://www.reddit.com/user/farming_future' },
+    { name: 'Green Growth', handle: '@greengrowth', platform: 'twitter', reach: '500K', sentiment: 'Very Positive', engagement: 88, profileUrl: 'https://twitter.com/greengrowth' },
+    { name: 'Crop Watch', handle: '@cropwatch_org', platform: 'reddit', reach: '320K', sentiment: 'Negative', engagement: 65, profileUrl: 'https://www.reddit.com/user/cropwatch_org' },
+    { name: 'Sustainable Life', handle: '@sust_life', platform: 'twitter', reach: '210K', sentiment: 'Positive', engagement: 72, profileUrl: 'https://twitter.com/sust_life' },
 ];
 
-export default function InfluencerTable() {
+export default function InfluencerTable({ influencers = INFLUENCERS }: { influencers?: any[] }) {
+    const displayData = influencers.length > 0 ? influencers : INFLUENCERS;
+
     return (
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl p-6 shadow-xl h-full flex flex-col relative overflow-hidden">
+        <div className="bg-card text-foreground border border-border rounded-2xl p-6 shadow-xl h-full flex flex-col relative overflow-hidden">
             {/* Background Glow */}
-            <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+            <div className="absolute top-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
             <div className="flex items-center justify-between mb-6 relative z-10">
                 <div className="flex items-center gap-2">
-                    <div className="p-2 bg-slate-800 rounded-lg border border-slate-700">
-                        <Trophy size={20} className="text-yellow-400" />
+                    <div className="p-2 bg-muted rounded-lg border border-border">
+                        <Trophy size={20} className="text-primary" />
                     </div>
-                    <h3 className="text-xl font-bold text-white">Top Influencers</h3>
+                    <h3 className="text-xl font-bold text-foreground">Top Influencers</h3>
                 </div>
-                <button className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
-                    View All <ExternalLink size={12} />
-                </button>
+
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar relative z-10">
-                <div className="space-y-3">
-                    {INFLUENCERS.map((inf, i) => (
-                        <div
-                            key={i}
-                            className="group flex items-center gap-4 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300"
-                        >
-                            {/* Rank */}
-                            <div className={`
-                                w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm
-                                ${i === 0 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                                    i === 1 ? 'bg-slate-400/20 text-slate-300 border border-slate-400/30' :
-                                        i === 2 ? 'bg-orange-700/20 text-orange-400 border border-orange-700/30' :
-                                            'bg-slate-800 text-slate-500'}
-                            `}>
-                                #{i + 1}
-                            </div>
-
-                            {/* Avatar & Info */}
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-slate-300 ring-2 ring-slate-800 group-hover:ring-blue-500/30 transition-all">
-                                    <User size={18} />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="font-bold text-white truncate group-hover:text-blue-400 transition-colors">{inf.name}</p>
-                                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                                        {inf.platform === 'Twitter' ? (
-                                            <span className="flex items-center gap-1"><Twitter size={10} className="text-blue-400" /> {inf.handle}</span>
-                                        ) : (
-                                            <span className="flex items-center gap-1"><MessageCircle size={10} className="text-orange-400" /> {inf.handle}</span>
-                                        )}
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
+                            <th className="py-2">Rank</th>
+                            <th className="py-2">Influencer</th>
+                            <th className="py-2 text-right">Reach</th>
+                            <th className="py-2 text-center">Sentiment</th>
+                            <th className="py-2 text-center">Profile</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {displayData.map((influencer, i) => (
+                            <tr
+                                key={i}
+                                className="group border-b border-border/50 last:border-b-0 hover:bg-muted/30 transition-colors duration-200"
+                            >
+                                <td className="py-3">
+                                    <div className={`
+                                        w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm
+                                        ${i === 0 ? 'bg-primary/10 text-primary border border-primary/20' :
+                                            i === 1 ? 'bg-secondary/10 text-secondary-foreground border border-secondary/20' :
+                                                i === 2 ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20' :
+                                                    'bg-muted text-muted-foreground'}
+                                    `}>
+                                        #{i + 1}
                                     </div>
-                                </div>
-                            </div>
+                                </td>
+                                <td className="py-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center text-xs font-bold text-white relative overflow-hidden group-hover:scale-110 transition-transform">
+                                            {influencer.name.charAt(0)}
+                                            {/* Platform Indicator Dot */}
+                                            <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-card ${influencer.platform === 'twitter' ? 'bg-sky-500' :
+                                                influencer.platform === 'youtube' ? 'bg-destructive' :
+                                                    influencer.platform === 'reddit' ? 'bg-orange-600' : 'bg-muted-foreground'
+                                                }`}></div>
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-sm font-semibold text-foreground truncate max-w-[120px]">{influencer.name}</span>
+                                            <span className="text-xs text-muted-foreground truncate max-w-[120px] opacity-70 group-hover:opacity-100 transition-opacity">{influencer.handle}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="py-3 text-right text-sm text-foreground font-mono">{influencer.reach}</td>
+                                <td className="py-3 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide border ${influencer.sentiment === 'Positive' || influencer.sentiment === 'Very Positive' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                        influencer.sentiment === 'Negative' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                                            'bg-muted/50 text-muted-foreground border-border'
+                                        }`}>
+                                        {influencer.sentiment}
+                                    </span>
+                                </td>
+                                <td className="py-3 text-center">
+                                    <a
+                                        href={influencer.profileUrl || '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all transform hover:scale-105"
+                                        title="View Profile"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </a>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
-                            {/* Stats */}
-                            <div className="text-right min-w-[80px]">
-                                <div className="text-sm font-bold text-white">{inf.reach}</div>
-                                <div className="text-xs text-slate-500 flex items-center justify-end gap-1">
-                                    <TrendingUp size={10} className={inf.engagement > 80 ? 'text-green-400' : 'text-slate-400'} />
-                                    {inf.engagement}% Eng.
-                                </div>
-                                {/* Mini Progress Bar */}
-                                <div className="w-full h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
-                                    <div
-                                        className="h-full bg-blue-500 rounded-full"
-                                        style={{ width: `${inf.engagement}%` }}
-                                    />
-                                </div>
-                            </div>
+            <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Based on recent activity</span>
 
-                            {/* Action */}
-                            <button className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 text-xs font-bold hover:bg-blue-500 hover:text-white transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0">
-                                Follow
-                            </button>
-                        </div>
-                    ))}
-                </div>
             </div>
         </div>
     );
