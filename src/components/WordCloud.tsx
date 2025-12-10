@@ -53,9 +53,10 @@ export default function WordCloud({ topics = TOPICS }: { topics?: any[] }) {
 
             <div className="flex flex-wrap gap-3 justify-center items-center flex-1 content-center relative z-10">
                 {displayTopics.map((topic, i) => {
-                    // Dynamic sizing based on value
-                    const fontSize = Math.max(0.75, topic.value / 35);
-                    const padding = Math.max(0.5, topic.value / 200);
+                    // Dynamic sizing based on value, capped for mobile safety
+                    // Mobile: smaller font base. Desktop: larger.
+                    const fontSize = Math.max(0.7, Math.min(topic.value / 45, 1.8));
+                    const padding = Math.max(0.3, Math.min(topic.value / 250, 0.8));
 
                     return (
                         <div
@@ -64,7 +65,7 @@ export default function WordCloud({ topics = TOPICS }: { topics?: any[] }) {
                                 relative group/tag cursor-pointer transition-all duration-300 ease-out
                                 ${topic.bg} ${topic.border} border
                                 hover:scale-110 hover:shadow-lg hover:shadow-${topic.color.split('-')[1]}-500/20
-                                rounded-full flex items-center justify-center
+                                rounded-full flex items-center justify-center max-w-full
                             `}
                             style={{
                                 padding: `${padding}rem ${padding * 2}rem`,
@@ -73,7 +74,7 @@ export default function WordCloud({ topics = TOPICS }: { topics?: any[] }) {
                             }}
                         >
                             <span
-                                className={`font-bold ${topic.color} whitespace-nowrap transition-colors`}
+                                className={`font-bold ${topic.color} whitespace-nowrap transition-colors truncate max-w-[80vw] md:max-w-none`}
                                 style={{ fontSize: `${fontSize}rem` }}
                             >
                                 {topic.text}

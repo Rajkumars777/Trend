@@ -154,7 +154,7 @@ export default function Dashboard() {
         {/* Right Column: KPIs (1/3 width) */}
         <div className="flex flex-col gap-4 h-full">
           {/* KPI Cards Grid (2x2) */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <StatCard title="Total Posts" value={totalPosts} trend="+12%" trendUp={true} icon={MessageSquare} color="blue" />
             <StatCard title="Sentiment" value={avgSentiment} trend="+0.5" trendUp={Number(avgSentiment) > 0} icon={Activity} color="green" />
             <StatCard

@@ -21,9 +21,9 @@ export default function StatCard({ title, value, trend, trendUp, icon: Icon, col
     return (
         <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md">
             <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-muted-foreground text-sm font-medium mb-1">{title}</p>
-                    <h3 className="text-3xl font-bold text-foreground">{value}</h3>
+                <div className="min-w-0 flex-1 mr-2">
+                    <p className="text-muted-foreground text-sm font-medium mb-1 truncate">{title}</p>
+                    <h3 className="text-2xl md:text-3xl font-bold text-foreground break-words leading-tight">{value}</h3>
                 </div>
                 <div className={clsx('p-3 rounded-xl border', colorStyles[color])}>
                     <Icon size={24} />
