@@ -41,7 +41,25 @@ The system operates on a strictly linear "Extract-Transform-Load-Analyze" (ETLA)
 ### Phase 1: Data Gathering (Ingestion)
 **File:** `scripts/agri_pipeline.py` (Function: `fetch_all`)
 
-### Phase 1: Data Gathering (Ingestion) Detail
+> **⚡ Real-Time Data Strategy**
+> The platform operates on a "Poll-and-Push" model. The pipeline runs periodically (or on-demand) to fetch specific "Live" data points vs "Static" indicators.
+>
+> | Data Domain | Source | Real-Time Mechanism | Refresh Rate/Trigger |
+> | :--- | :--- | :--- | :--- |
+> | **Market Prices** | **Yahoo Finance** | Live Futures (`ZR=F`) & FX Tickers (`INR=X`) | On every pipeline execution |
+> | **Weather** | **OpenWeatherMap / WeatherAPI** | API Call (Current Conditions) | On-demand (page load or pipeline) |
+> | **Social (Reddit)** | **Reddit JSON Search** | Polls `new` feed for specific keywords | Batch poll (e.g., every 1-6 hrs) |
+> | **News** | **Google News RSS** | RSS Feed Parsing (`pubDate` sort) | Batch poll |
+> | **Video** | **YouTube Search** | HTML Scraping (Latest uploads) | Batch poll |
+> | **Economic Stats** | **World Bank** | Annual/Quarterly API Updates | Static (Annual cache) |
+
+#### Live Execution Flow
+When `python scripts/agri_pipeline.py fetch` is run:
+1.  **Synchronous**: The script contacts `yfinance` to get the *exact* market price at that second.
+2.  **Synchronous**: It calls Weather APIs for the latest temp/rain in capital cities.
+3.  **Asynchronous/Batch**: It iterates through keywords (`Rice`, `Wheat`) to pull the latest 10-20 posts from Social/News sources that appeared since the last run.
+
+### Detailed Source Breakdown
 **File:** `scripts/agri_pipeline.py` (Function: `fetch_all`)
 
 The system aggregates data from three distinct sources using the following specifications:
@@ -65,6 +83,8 @@ The system aggregates data from three distinct sources using the following speci
       "trend": "+1.2%" 
     }
     ```
+
+    > **Real-Time Note**: This system now dynamically fetches live futures (e.g., `ZR=F` for Rice) and localized currency rates (`INR=X`, `JPY=X`) instead of using static configuration.
 
 #### 2. Socio-Economic Indicators & Weather
 *   **Source**: World Bank Open Data & OpenWeatherMap.
@@ -132,6 +152,11 @@ The system aggregates data from three distinct sources using the following speci
       "title": "YouTube Video: dQw4w9WgXcQ",
       "content": "Video discussion on agriculture...",
       "source": "youtube",
+      "url": "https://youtu.be/dQw4w9WgXcQ"
+    }
+    ```
+
+### Phase 2: Data Processing & Feature Extraction (Deep Dive)
       "url": "https://youtu.be/dQw4w9WgXcQ"
     }
     ```
@@ -249,6 +274,14 @@ How the single "Soy powder" post contributes to the trend:
     { "date": "2025-12-13", "predicted_sentiment": 0.35, "confidence": "High" }
     ```
 
+    { "date": "2025-12-13", "predicted_sentiment": 0.35, "confidence": "High" }
+    ```
+
+#### Latest Data Count (Live 2025)
+*   **Total Posts**: ~3,300+
+*   **Sources**: Reddit, Google News, YouTube
+*   **Forecast Horizon**: 7 Days
+
 ---
 
 ## 3. Machine Learning & AI Usage (Deep Dive)
@@ -284,7 +317,7 @@ This is the brain of the operation. It manages model loading, inference, and fal
 ### Backend (`scripts/`)
 | File | Responsibility | Key Functions |
 | :--- | :--- | :--- |
-| `agri_pipeline.py` | **Orchestrator**. The main entry point. Fetches data, runs enrichment loops, and triggers forecasting. | `fetch_all()`, `enrich_data()`, `forecast_trends()` |
+| `agri_pipeline.py` | **Orchestrator**. The main entry point. Fetches data (News, Reddit, YouTube, Prices), runs enrichment loops, and triggers forecasting. | `fetch_all()`, `enrich_data()`, `forecast_trends()` |
 | `utils/ai_client.py` | **Intelligence**. Wraps all ML operations. Handles API calls to Hugging Face and local model inference. | `analyze(text)`, `_query()` |
 | `utils/world_bank.py` | **Data Connector**. Interface for the World Bank Open Data API. | `fetch_all_stats()`, `get_indicator()` |
 | `utils/agri_keywords.py` | **Knowledge Base**. Static lists of agricultural terms and hashtags used for search and extraction. | `ALL_KEYWORDS`, `HASHTAGS` |

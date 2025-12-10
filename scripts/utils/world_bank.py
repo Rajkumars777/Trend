@@ -1,13 +1,13 @@
 import requests
 
 class WorldBankClient:
-    BASE_URL = "http://api.worldbank.org/v2"
+    BASE_URL = "https://api.worldbank.org/v2" # Force HTTPS
     
     # ISO Codes for our target countries
     COUNTRY_CODES = {
         "India": "IN", "United States": "US", "Brazil": "BR", "China": "CN", 
         "Russia": "RU", "Australia": "AU", "Canada": "CA", "Argentina": "AR",
-        "France": "FR", "Ukraine": "UA"
+        "France": "FR", "Ukraine": "UA", "Japan": "JP", "Philippines": "PH" # Ensure JP/PH exist
     }
     
     # Indicators
@@ -26,19 +26,29 @@ class WorldBankClient:
         ind_code = self.INDICATORS.get(indicator_key)
         url = f"{self.BASE_URL}/country/{code}/indicator/{ind_code}"
         
-        try:
-            # format=json, per_page=1 to get just one
-            params = {'format': 'json', 'date': year, 'per_page': 1}
-            # Short timeout to fail fast
-            resp = requests.get(url, params=params, timeout=3)
-            if resp.status_code == 200:
-                data = resp.json()
-                if len(data) > 1 and data[1]:
-                    val = data[1][0].get('value')
-                    return round(val, 2) if val is not None else None
-        except Exception:
-            # Silent fail for individual indicators to keep pipeline moving
-            pass
+        # Retry logic for robustness
+        for attempt in range(2):
+            try:
+                # format=json, per_page=1 to get just one
+                # Try 2022 first, if None, logic elsewhere could fallback to 2021 if needed
+                # But WB often has lags, so maybe fetch range?
+                # Let's try fetching latest available by using "MRV" (Most Recent Value) logic if possible
+                # Or just fetch a range "2020:2023" and take first non-null
+                
+                params = {'format': 'json', 'date': '2020:2023', 'per_page': 100} 
+                resp = requests.get(url, params=params, timeout=10) # Increased timeout
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # WB API V2 returns [metadata, [data...]]
+                    if len(data) > 1 and isinstance(data[1], list):
+                        # Find first non-null value in the range
+                        for entry in data[1]:
+                            if entry.get('value') is not None:
+                                return round(entry.get('value'), 2)
+            except Exception as e:
+                print(f"      ⚠️ WB API Error ({country_name}, {indicator_key}): {e}")
+                pass
             
         return None
 
