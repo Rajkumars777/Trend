@@ -5,24 +5,59 @@ import { CloudRain, Sun, Thermometer, Wind } from 'lucide-react';
 
 export default function LiveHeader() {
     const [time, setTime] = useState<Date | null>(null);
-    const [weather, setWeather] = useState({ temp: 24, rain: 1200, wind: 12 });
+    const [weather, setWeather] = useState<{ temp: string | number; rain: string | number; wind: string | number; }>({ temp: '--', rain: '--', wind: '--' });
+    const [locationName, setLocationName] = useState('Loading location...');
 
     useEffect(() => {
-        setTime(new Date()); // Set initial client time
+        setTime(new Date());
         const timer = setInterval(() => setTime(new Date()), 1000);
 
-        // Simulate dynamic weather changes
-        const weatherTimer = setInterval(() => {
-            setWeather(prev => ({
-                temp: +(prev.temp + (Math.random() * 0.4 - 0.2)).toFixed(1),
-                rain: Math.floor(prev.rain + (Math.random() * 10 - 5)),
-                wind: +(prev.wind + (Math.random() * 2 - 1)).toFixed(1)
-            }));
-        }, 5000);
+        const fetchWeather = async (lat: number, lon: number) => {
+            try {
+                const response = await fetch(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,rain,wind_speed_10m`
+                );
+                const data = await response.json();
+
+                if (data.current) {
+                    setWeather({
+                        temp: data.current.temperature_2m,
+                        rain: data.current.rain,
+                        wind: data.current.wind_speed_10m
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch weather data", error);
+            }
+        };
+
+        const getLocationAndFetchWeather = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        fetchWeather(position.coords.latitude, position.coords.longitude);
+                        setLocationName('Local Weather');
+                    },
+                    (error) => {
+                        console.warn("Geolocation denied or failed, using default (London)", error);
+                        fetchWeather(51.5074, -0.1278); // Default to London
+                        setLocationName('London (Default)');
+                    }
+                );
+            } else {
+                fetchWeather(51.5074, -0.1278);
+                setLocationName('London (Default)');
+            }
+        };
+
+        getLocationAndFetchWeather();
+
+        // Refresh weather every 15 minutes
+        const weatherInterval = setInterval(getLocationAndFetchWeather, 15 * 60 * 1000);
 
         return () => {
             clearInterval(timer);
-            clearInterval(weatherTimer);
+            clearInterval(weatherInterval);
         };
     }, []);
 
@@ -32,7 +67,10 @@ export default function LiveHeader() {
                 <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-positive tracking-tight">
                     Agriculture Intelligence Hub
                 </h2>
-                <p className="text-neutral mt-1 font-medium">Real-time market, social, and environmental insights.</p>
+                <div className="flex items-center gap-2 mt-1">
+                    <p className="text-neutral font-medium">Real-time market, social, and environmental insights.</p>
+                    {/* Optional: Show location source if desired, currently sticking to design */}
+                </div>
             </div>
 
             <div className="flex gap-4 items-center">

@@ -105,3 +105,14 @@ CROP_TICKERS = {
     "Cotton": "CT=F",
     "Coffee": "KC=F"
 }
+
+# 10. SENTIMENT LEXICONS (For Hybrid AI)
+AGRI_POS_WORDS = [
+    "record", "bumper", "high", "boost", "profit", "happy", "opportunity", 
+    "excellent", "good rain", "subsidy", "subsidies"
+]
+AGRI_NEG_WORDS = [
+    "destroy", "damage", "loss", "crash", "low", "drought", "flood", 
+    "pest", "attack", "shortage", "anxiety", "protest", "poor", "threat", "drop"
+]
+GENERIC_AGRI_WORDS = ["agriculture", "farm", "crop", "harvest", "sowing", "yield", "mandi", "msp"]

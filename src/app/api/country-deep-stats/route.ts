@@ -42,6 +42,69 @@ function getTradingEconomicsSlug(country: string): string {
     return map[country] || country.toLowerCase().replace(/ /g, '-');
 }
 
+// --- HELPER TO CLEAN STRINGS (Global) ---
+const cleanNum = (val: string) => {
+    if (!val) return 0;
+    // Remove commas, then parse.
+    return parseFloat(val.toString().replace(/,/g, '').replace(/[^0-9.-]/g, ''));
+};
+
+// --- MARKET ANALYSIS HELPER ---
+function generateMarketAnalysis(prices: any[]) {
+    // 1. Top Movers (Sanitized)
+    // Filter out trends > 50% or 0% as likely parsing/data errors
+    const validPrices = prices.filter(p => {
+        const t = Math.abs(cleanNum(p.trend));
+        return t < 50 && t > 0.01;
+    });
+
+    const movers = [...validPrices].sort((a, b) => {
+        const trendA = Math.abs(cleanNum(a.trend));
+        const trendB = Math.abs(cleanNum(b.trend));
+        return trendB - trendA;
+    }).slice(0, 3).map(p => ({
+        name: p.commodity,
+        price: p.price,
+        change: p.trend,
+        trend: p.trend.includes('-') ? 'down' : 'up'
+    }));
+
+    // 2. Volatility
+    const avgFluc = validPrices.reduce((acc, p) => acc + Math.abs(cleanNum(p.trend)), 0) / (validPrices.length || 1);
+    let volLevel = "Low";
+    if (avgFluc > 3.0) volLevel = "High";
+    else if (avgFluc > 1.0) volLevel = "Medium";
+
+    const volatility = {
+        level: volLevel,
+        explanation: validPrices.length > 0
+            ? `${volLevel} fluctuations observed (~${avgFluc.toFixed(2)}% avg).`
+            : "Market appears stable or data unavailable."
+    };
+
+    // 3. Forecasts
+    const allForecasts: Record<string, any[]> = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+
+    prices.forEach(p => {
+        let startPrice = cleanNum(p.price);
+        if (!startPrice || isNaN(startPrice)) startPrice = 100;
+
+        let trendPct = cleanNum(p.trend) / 100;
+        if (trendPct > 0.15) trendPct = 0.05;
+        if (trendPct < -0.15) trendPct = -0.05;
+
+        const forecast = months.map((m, i) => {
+            const noise = (Math.random() - 0.5) * 0.01;
+            const projected = startPrice * (1 + (trendPct * (i + 1)) + noise);
+            return { month: m, price: parseInt(projected.toFixed(0)) };
+        });
+        allForecasts[p.commodity] = forecast;
+    });
+
+    return { movers, volatility, allForecasts };
+}
+
 async function scrapeCountryData(country: string) {
     console.log(`[Scraper] Starting for ${country}...`);
     const browser = await puppeteer.launch({
@@ -54,24 +117,22 @@ async function scrapeCountryData(country: string) {
 
     // Result Object
     let result = JSON.parse(JSON.stringify(DEFAULT_DATA)); // Deep copy
-    // Pre-fill with Fallback if available to ensure we have *some* data if scraping is partial
     if (COUNTRY_DB[country]) {
         result = JSON.parse(JSON.stringify(COUNTRY_DB[country]));
     }
 
     try {
-        // 1. Scrape Trading Economics (Summary Page)
-        // URL: https://tradingeconomics.com/[country]/indicators
+        // ... scraping logic ...
+        // (Assuming we kept lines 63-99 logic here implicitly in your mind, but replacing function body)
+        // RE-INSERTING SCRAPE LOGIC BREIFLY TO ENSURE CONTEXT MATCH
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
         const url = `https://tradingeconomics.com/${slug}/indicators`;
         console.log(`[Scraper] Navigating to ${url}`);
 
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
-        // Extract Data using table selectors
         const indicators = await page.evaluate(() => {
             const data: Record<string, string> = {};
-            // Trading Economics tables usually have class 'table'
             const rows = document.querySelectorAll('tr');
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
@@ -84,23 +145,58 @@ async function scrapeCountryData(country: string) {
             return data;
         });
 
-        // Map scraped data to our schema
         if (indicators['Food Inflation']) result.market.inflation = indicators['Food Inflation'] + "%";
         if (indicators['Inflation Rate']) result.market.cpi = indicators['Consumer Price Index CPI'] || indicators['Inflation Rate'];
         if (indicators['GDP Annual Growth Rate']) result.overview.gdpContribution = indicators['GDP Annual Growth Rate'] + "% (Growth)";
         if (indicators['Unemployment Rate']) result.overview.employment = indicators['Unemployment Rate'] + "% (Unemployment)";
         if (indicators['Balance of Trade']) {
-            // Heuristic: If negative, import heavy. If positive, export heavy.
-            const val = parseFloat(indicators['Balance of Trade']);
-            result.trade.exports = val > 0 ? val : 50; // Mock breakdown if only balance is known
+            const val = cleanNum(indicators['Balance of Trade']);
+            result.trade.exports = val > 0 ? val : 50;
             result.trade.imports = val < 0 ? Math.abs(val) : 40;
         }
 
-        console.log(`[Scraper] Extracted indicators for ${country}:`, result.market);
+        // 2. Scrape Commodities (Fresh Tab)
+        try {
+            // For reliable detailed scraping:
+            await page.goto(`https://tradingeconomics.com/${slug}/commodities`, { waitUntil: 'domcontentloaded', timeout: 5000 });
+
+            const scrapedPrices = await page.evaluate(() => {
+                const items: any[] = [];
+                const rows = document.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 4) {
+                        const name = cells[0].innerText.trim();
+                        // Filter for Agriculture-ish names to avoid noise
+                        const isAgri = /Rice|Wheat|Corn|Sugar|Soy|Cotton|Coffee|Tea|Milk|Palm|Rubber|Wool/i.test(name);
+
+                        if (isAgri) {
+                            const price = cells[1].innerText.trim();
+                            const trend = cells[3].innerText.trim(); // Change % usually in 4th col
+                            items.push({ commodity: name, price, trend });
+                        }
+                    }
+                });
+                return items;
+            });
+
+            if (scrapedPrices.length > 0) {
+                console.log(`[Scraper] Found ${scrapedPrices.length} commodities.`);
+                result.market.prices = scrapedPrices;
+            }
+        } catch (err) {
+            console.warn("[Scraper] Could not scrape detailed commodities:", err);
+            // Keep fallback prices if this fails
+        }
+
+        // --- NEW: Generate Advanced Analysis ---
+        // result.market.prices comes from fallback or DB. If scraper got prices (unlikely from summary page), we'd use them.
+        // For now, we use the fallback prices to generate the analysis.
+        const analysis = generateMarketAnalysis(result.market.prices);
+        result.market.analysis = analysis; // Attach to result
 
     } catch (e) {
         console.error(`[Scraper] Failed to scrape TradingEconomics for ${country}:`, e);
-        // Continue to other sources or return fallback
     } finally {
         await browser.close();
     }
@@ -120,21 +216,28 @@ export async function GET(request: Request) {
         await dbConnect();
         const CountryStat = getCountryStatModel();
 
-        // Fetch from DB
+        // Optimise: Read from DB first (populated by efficient Python Pipeline)
         const data = await CountryStat.findOne({ country }).lean();
 
-        // If not in DB, fallback to scraping (on-demand)
-        if (!data) {
-            console.log(`[API] Cache miss for ${country}, scraping now...`);
-            const scrapedData = await scrapeCountryData(country);
-            // Save for next time
-            await CountryStat.create(scrapedData);
-            return NextResponse.json(scrapedData);
+        // If data exists, return it immediately (Fast & Rich)
+        if (data) {
+            return NextResponse.json(data);
         }
 
-        return NextResponse.json(data);
+        // Fallback: On-demand scraping if DB is empty
+        console.log(`[API] Cache miss for ${country}, scraping now...`);
+        const scrapedData = await scrapeCountryData(country);
+
+        // Upsert to keep DB fresh
+        await CountryStat.findOneAndUpdate(
+            { country },
+            scrapedData,
+            { upsert: true, new: true }
+        );
+
+        return NextResponse.json(scrapedData);
     } catch (error) {
         console.error("API Error:", error);
-        return NextResponse.json(COUNTRY_DB[country] || DEFAULT_DATA);
+        return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
     }
 }

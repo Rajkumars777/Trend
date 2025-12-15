@@ -1,4 +1,7 @@
+
 import os
+import time
+from dotenv import load_dotenv
 
 # Force usage of PyTorch and disable TF/Keras 3 conflicts
 os.environ["USE_TORCH"] = "True"
@@ -6,8 +9,6 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
 import requests
-import time
-from dotenv import load_dotenv
 
 # Load Environment Variables
 # Resolve path relative to THIS script file
@@ -23,7 +24,12 @@ class AgriAIClient:
         self.api_token = os.getenv("HF_TOKEN")
         self.headers = {"Authorization": f"Bearer {self.api_token}"}
         
-        # Endpoints (Keep for Zero-Shot checks if needed, but we will rely on local for sentiment)
+        # Default Attributes
+        self.sentiment_pipe = None
+        self.feature_extractor = None
+        self.agri_anchor = None
+        
+        # Endpoints
         self.classifier_url = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
 
         # Categories for Zero-Shot
@@ -45,16 +51,40 @@ class AgriAIClient:
                 print("   ✅ Local model loaded successfully.")
             else:
                 print("   ⚠️ Local model not found. Attempting to load from Hugging Face Hub (slower)...")
-                # Fallback to HF Hub
-                self.sentiment_pipe = pipeline("sentiment-analysis", model="lxyuan/distilbert-base-multilingual-cased-sentiments-student", device=-1) # CPU
+                self.sentiment_pipe = pipeline("sentiment-analysis", model="lxyuan/distilbert-base-multilingual-cased-sentiments-student", device=-1)
                 print("   ✅ Model loaded from Hub.")
                 
         except Exception as e:
             print(f"   ⚠️ Could not load local model: {e}")
             self.sentiment_pipe = None
 
+        # Initialize Feature Extraction for Content Understanding (Relevance)
+        try:
+            import torch
+            import torch.nn.functional as F
+            self.torch = torch
+            self.F = F
+            
+            print("   🧠 Loading Feature Extractor for Content Relevance...")
+            # Re-define path in this scope
+            local_model_path = os.path.join(BASE_DIR, '../../models/sentiment-model')
+            model_name_or_path = local_model_path if os.path.exists(local_model_path) else "lxyuan/distilbert-base-multilingual-cased-sentiments-student"
+            
+            self.feature_extractor = pipeline("feature-extraction", model=model_name_or_path, device=-1)
+            
+            # Compute Anchor Vector for "Agriculture"
+            # This represents the "Concept" of Agriculture in the model's latent space
+            anchor_text = "agriculture farming crops harvest wheat rice market prices farmers soil weather monsoon fertilizer pesticide government policy rural"
+            anchor_feats = self.feature_extractor(anchor_text, return_tensors="pt")[0]
+            self.agri_anchor = torch.mean(anchor_feats, dim=0) # Mean pooling
+            
+            print("   ✅ Relevance Engine Initialized (Embedding-based).")
+        except Exception as e:
+            print(f"   ⚠️ Feature Extractor Error: {e}")
+            self.feature_extractor = None
+
+
     def _query(self, url, payload, retries=3):
-        # Keep existing query method for other checks
         for i in range(retries):
             try:
                 response = requests.post(url, headers=self.headers, json=payload, timeout=20)
@@ -69,73 +99,142 @@ class AgriAIClient:
         return None
 
     def analyze(self, text):
+        print(f"DEBUG: Analyzing '{text[:20]}...'")
         if not text or len(text) < 5: return None
 
         try:
-            # 1. Relevance Check (Is this Agriculture?)
-            payload_rel = {
-                "inputs": text,
-                "parameters": {"candidate_labels": self.agri_labels, "multi_class": False}
-            }
-            rel_data = self._query(self.classifier_url, payload_rel)
+            # 1. Relevance Check (Concept Matching Strategy)
+            # Replaces Embedding check (bias issue) and Simple Keyword check (too broad).
+            # Rule: Text must contain specific Agricultural Concepts (Crops, Markets) 
+            # OR multiple Generic Contexts to be considered relevant.
             
-            if not rel_data: return None
-            
-            # Parse Zero Shot
-            if isinstance(rel_data, list): 
-                rel_data.sort(key=lambda x: x.get('score', 0), reverse=True)
-                top_item = rel_data[0]
-                top_label = top_item['label']
-                top_score = top_item['score']
-            elif isinstance(rel_data, dict) and 'labels' in rel_data:
-                top_label = rel_data['labels'][0]
-                top_score = rel_data['scores'][0]
-            else:
-                return None
-            
-            is_relevant = (top_label == "agriculture" and top_score > 0.5)
-            
-            if not is_relevant:
-                return {
-                    "is_relevant": False,
-                    "reason": f"Classified as {top_label} ({top_score:.2f})"
-                }
-                
-            # 2. Topic Categorization (If Relevant)
-            payload_topic = {
-                 "inputs": text,
-                 "parameters": {"candidate_labels": self.topic_labels, "multi_class": False}
-            }
-            topic_data = self._query(self.classifier_url, payload_topic)
-            category = "General Agriculture"
-            if topic_data:
-                 if isinstance(topic_data, list):
-                     topic_data.sort(key=lambda x: x.get('score', 0), reverse=True)
-                     category = topic_data[0]['label']
-                 elif isinstance(topic_data, dict) and 'labels' in topic_data:
-                     category = topic_data['labels'][0]
+            # Import Lists
+            try:
+                from utils.agri_keywords import (
+                    AGRI_POS_WORDS, AGRI_NEG_WORDS, GENERIC_AGRI_WORDS,
+                    CROP_KEYWORDS, PEST_DISEASE_KEYWORDS, INPUT_KEYWORDS,
+                    POLICY_KEYWORDS, TECH_KEYWORDS, OPERATION_KEYWORDS
+                )
+                MARKET_TERMS = ["price", "prices", "market", "markets", "msp", "mandi", "mandis", "rate", "rates", "rupee", "dollar", "export", "import", "trade", "inflation"]
+                WEATHER_TERMS = ["rain", "rains", "monsoon", "drought", "droughts", "flood", "floods", "weather", "temperature", "humid", "heatwave", "cyclone", "cyclones"]
+            except ImportError:
+                try:
+                    from .agri_keywords import (
+                         AGRI_POS_WORDS, AGRI_NEG_WORDS, GENERIC_AGRI_WORDS,
+                         CROP_KEYWORDS, PEST_DISEASE_KEYWORDS, INPUT_KEYWORDS,
+                         POLICY_KEYWORDS, TECH_KEYWORDS, OPERATION_KEYWORDS
+                    )
+                    MARKET_TERMS = ["price", "prices", "market", "markets", "msp", "mandi", "mandis", "rate", "rates", "rupee", "dollar", "export", "import", "trade", "inflation"]
+                    WEATHER_TERMS = ["rain", "rains", "monsoon", "drought", "droughts", "flood", "floods", "weather", "temperature", "humid", "heatwave", "cyclone", "cyclones"]
+                except ImportError:
+                    GENERIC_AGRI_WORDS = ["farming", "agriculture"]
+                    AGRI_POS_WORDS = ["good", "great", "excellent", "profit", "record", "bumper", "high", "boost", "happy", "opportunity", "good rain", "subsidy", "subsidies"]
+                    AGRI_NEG_WORDS = ["bad", "poor", "loss", "drought", "flood", "crash", "damage", "destroy", "shortage", "anxiety", "protest", "threat", "drop", "pest", "attack", "low"]
+                    CROP_KEYWORDS = ["rice", "wheat", "corn", "soybean", "soybeans", "cotton", "coffee", "sugarcane", "tomato", "onion", "potato", "paddy"]
+                    PEST_DISEASE_KEYWORDS = ["locust", "locusts", "pest", "pests", "attack", "attacks", "disease", "infestation"]
+                    INPUT_KEYWORDS = ["fertilizer", "fertilizers", "urea", "pesticide", "pesticides", "seed", "seeds"]
+                    POLICY_KEYWORDS = ["subsidy", "subsidies", "loan", "govt", "bill"]
+                    TECH_KEYWORDS = ["drone", "drones", "ai", "tech", "technology"]
+                    OPERATION_KEYWORDS = ["yield", "yields", "sowing", "harvest", "harvests", "irrigation"]
+                    MARKET_TERMS = ["price", "prices", "market", "markets"]
+                    WEATHER_TERMS = ["rain", "rains", "flood", "floods"]
 
-            # 3. Sentiment Analysis
-            payload_sent = {"inputs": text}
-            sent_data = self._query(self.sentiment_url, payload_sent)
+            # Compile all keywords for later use
+            all_keywords = AGRI_POS_WORDS + AGRI_NEG_WORDS + GENERIC_AGRI_WORDS
+
+            # Split Generic into Strong and Weak
+            # "Agriculture", "Farming", "Farm", "Crop" are Weak (too generic, could be gaming)
+            # "Harvest", "Sowing", "Yield", "Mandi", "MSP" are Strong
+            truly_generic = ["agriculture", "farming", "farmers", "farm", "crop", "rural"]
+            specific_generic = [w for w in GENERIC_AGRI_WORDS if w.lower() not in truly_generic]
+
+            # Flatten Concept Lists (taking care to split phrases like "fertilizer shortage" into "fertilizer", "shortage")
+            raw_concept_list = (
+                CROP_KEYWORDS + MARKET_TERMS + WEATHER_TERMS + 
+                PEST_DISEASE_KEYWORDS + INPUT_KEYWORDS + POLICY_KEYWORDS + 
+                TECH_KEYWORDS + OPERATION_KEYWORDS + specific_generic
+            )
             
-            # 3. Sentiment Analysis (LOCAL)
+            strong_concepts = set()
+            for phrase in raw_concept_list:
+                for word in phrase.lower().split():
+                    if len(word) > 2: # Avoid tiny words like "in", "of"
+                        strong_concepts.add(word)
+
+            weak_concepts = set([w.lower() for w in truly_generic])
+            
+            text_lower = text.lower()
+            tokens = text_lower.replace('.', ' ').replace(',', ' ').split()
+            
+            strong_count = sum(1 for t in tokens if t in strong_concepts)
+            weak_count = sum(1 for t in tokens if t in weak_concepts)
+            
+            # Debug Relevance
+            # print(f"DEBUG: Rel check - Strong={strong_count} ({[t for t in tokens if t in strong_concepts]}), Weak={weak_count}")
+
+            
+            is_relevant = False
+            
+            if strong_count >= 1:
+                is_relevant = True
+                reason = "Strong Context Match (Crop/Market/Weather)"
+            elif weak_count >= 2:
+                is_relevant = True
+                reason = "Multiple Generic Contexts"
+            else:
+                 is_relevant = False
+                 reason = "Insufficient Agricultural Context"
+
+            if not is_relevant:
+                 return {
+                     "is_relevant": False,
+                     "reason": reason
+                 }
+
+
+
+
+
+            # 2. Topic Categorization (Simplified)
+            # Default to General since we removed the external Zero-Shot API.
+            category = "General Agriculture"
+            
+            # Optional: Simple keyword-based topic deduction
+            if any(w in text_lower for w in ["price", "market", "msp", "rupee", "dollar"]):
+                category = "Market Prices"
+            elif any(w in text_lower for w in ["rain", "monsoon", "drought", "flood", "weather"]):
+                category = "Weather"
+            elif any(w in text_lower for w in ["pest", "locust", "disease", "attack"]):
+                category = "Pest & Disease"
+            elif any(w in text_lower for w in ["govt", "government", "policy", "subsidy", "bill"]):
+                category = "Government Policy"
+
+
+            # 3. Sentiment Analysis (HYBRID: Keywords + Model)
             sent_label = "Neutral"
             sent_score = 0.0
-
-            if self.sentiment_pipe:
-                 # Local Inference
-                 # Output format: [{'label': 'positive', 'score': 0.9}]
-                 result = self.sentiment_pipe(text[:512], truncation=True, top_k=1) # Limit length for BERT
-                 if result:
-                     top = result[0] # top_k=1 returns list
-                     sent_label = top['label']
-                     sent_score = top['score']
+            
+            has_pos = any(w in text_lower for w in AGRI_POS_WORDS)
+            has_neg = any(w in text_lower for w in AGRI_NEG_WORDS)
+            
+            # A. Heuristic Override
+            if has_pos and not has_neg:
+                sent_label = "POSITIVE" 
+                sent_score = 0.95
+            elif has_neg and not has_pos:
+                sent_label = "NEGATIVE"
+                sent_score = 0.95
             else:
-                 # Fallback (though likely won't work if quota exceeded)
-                 pass
-
-            # Normalize Label (DistilBERT might return 'positive', 'negative', 'neutral' lowercased)
+                # B. Model Inference (Fallback)
+                if self.sentiment_pipe:
+                     # Output format: [{'label': 'positive', 'score': 0.9}]
+                     result = self.sentiment_pipe(text[:512], truncation=True, top_k=1)
+                     if result:
+                         top = result[0]
+                         sent_label = top['label']
+                         sent_score = top['score']
+            
+            # Normalize Label
             sent_label = sent_label.lower()
             if sent_label == "positive":
                 final_label = "Positive"
@@ -147,58 +246,39 @@ class AgriAIClient:
                 final_label = "Neutral"
                 final_score = 0.0
 
-            # Apply Confidence Threshold (Reduce "weak" positive/negative)
-            # Lowered to 0.2 to ensure we capture Positive sentiments which often have lower confidence
-            SENTIMENT_THRESHOLD = 0.2
-            if final_label != "Neutral" and abs(sent_score) < SENTIMENT_THRESHOLD:
+            # Apply Confidence Threshold (Reduce "weak" predictions if not keyword-backed)
+            SENTIMENT_THRESHOLD = 0.7 
+            if final_label != "Neutral" and abs(final_score) < SENTIMENT_THRESHOLD:
                  final_label = "Neutral"
                  final_score = 0.0
 
-            # 4. Keyword Extraction
-            detected_keywords = ["Agriculture"]
-            try:
-                from utils.agri_keywords import ALL_KEYWORDS, HASHTAGS
-                found_keywords = []
-                text_lower = text.lower()
-                
-                # Check predefined agri keywords
-                for k in ALL_KEYWORDS:
-                    if k.lower() in text_lower:
-                        found_keywords.append(k) 
-                
-                # Check hashtags
-                words = text.split()
-                for w in words:
-                    if w.startswith("#"):
-                        clean_tag = w[1:].lower()
-                        if clean_tag in HASHTAGS:
-                            found_keywords.append(clean_tag)
-                
-                # Deduplicate and limit
-                detected_keywords = list(set(found_keywords))[:5]
-                # Filter out garbage (1-2 chars unless valid)
-                detected_keywords = [k for k in detected_keywords if len(k) > 2]
-                
-                if not detected_keywords:
-                     if category != "General Agriculture":
-                         detected_keywords = [category]
-                     else:
-                         detected_keywords = ["Agriculture"]
+            # 4. Keyword Extraction (Simple Fallback)
+            detected_keywords = []
+            words = text.split()
+            for w in words:
+                clean = w.lower().strip(".,!?")
+                if clean in all_keywords and len(clean) > 3:
+                    detected_keywords.append(clean.capitalize())
+            
+            if not detected_keywords:
+                detected_keywords = [category]
+            else:
+                detected_keywords = list(set(detected_keywords))[:5]
 
-            except ImportError:
-                 detected_keywords = ["Agriculture"]
 
             return {
                 "is_relevant": True,
                 "category": category,
                 "sentiment_class": final_label,
                 "sentiment_score": round(final_score, 4),
-                "confidence": round(top_score, 4),
+                "confidence": round(sent_score, 4) if 'sent_score' in locals() else 0.0,
                 "detected_keywords": detected_keywords
             }
 
         except Exception as e:
             print(f"      ⚠️ Parsing Error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
 if __name__ == "__main__":
@@ -217,6 +297,6 @@ if __name__ == "__main__":
         print(f"\nText: {s}")
         res = ai.analyze(s)
         if res and res['is_relevant']:
-             print(f"✅ RELEVANT | {res['category']} | {res['detected_keywords']}")
+             print(f"✅ RELEVANT | {res['category']} | {res['sentiment_class']} | {res['detected_keywords']}")
         else:
              print(f"❌ IRRELEVANT | {res.get('reason') if res else 'None'}")

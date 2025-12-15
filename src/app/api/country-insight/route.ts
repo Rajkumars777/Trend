@@ -121,6 +121,93 @@ export async function GET(request: Request) {
         if (density.pest > 20) trends.push("Pest Risks");
         if (trends.length === 0) trends.push("Stable Operations");
 
+        // ... existing logic ...
+
+        // 5. Crop-Specific Risk Analysis
+        const CROP_VARIANTS: Record<string, string[]> = {
+            "Rice": ["rice", "paddy", "basmati"],
+            "Wheat": ["wheat", "grain"],
+            "Cotton": ["cotton"],
+            "Soybean": ["soybean", "soy"],
+            "Corn": ["corn", "maize"],
+            "Sugarcane": ["sugarcane", "sugar"],
+            "Potato": ["potato"],
+            "Onion": ["onion"],
+            "Tomato": ["tomato"]
+        };
+
+        const SPECIFIC_ISSUES = {
+            "pest": ["bollworm", "armyworm", "locust", "whitefly", "borer", "pest", "beetle", "mite"],
+            "disease": ["rust", "blight", "rot", "virus", "fungus", "smut", "wilt"],
+            "climate": ["drought", "flood", "rain", "heatwave", "frost", "hail", "dry"],
+            "market": ["crash", "low price", "glut", "export ban"]
+        };
+
+        const cropHealthMap: Record<string, { count: number, issues: Set<string>, sentiment: number }> = {};
+
+        // Initialize Map
+        Object.keys(CROP_VARIANTS).forEach(c => cropHealthMap[c] = { count: 0, issues: new Set(), sentiment: 0 });
+
+        itemsToAnalyze.forEach(item => {
+            const text = `${item.title} ${item.content || ""}`.toLowerCase();
+
+            // Check each crop
+            Object.entries(CROP_VARIANTS).forEach(([cropName, keywords]) => {
+                if (keywords.some(k => text.includes(k))) {
+                    cropHealthMap[cropName].count++;
+                    detectedCrops.add(cropName);
+
+                    // Check Sentiment for this crop context
+                    let localScore = 0;
+                    POSITIVE_KEYWORDS.forEach(k => { if (text.includes(k)) localScore++; });
+                    NEGATIVE_KEYWORDS.forEach(k => { if (text.includes(k)) localScore--; });
+                    cropHealthMap[cropName].sentiment += localScore;
+
+                    // Identify Specific Issues
+                    Object.entries(SPECIFIC_ISSUES).forEach(([issueType, issueKeywords]) => {
+                        issueKeywords.forEach(issue => {
+                            if (text.includes(issue)) {
+                                cropHealthMap[cropName].issues.add(issue); // Add specific keyword found (e.g., "rust")
+                            }
+                        });
+                    });
+                }
+            });
+        });
+
+        // Format Crop Health Data for Frontend
+        const cropHealth = Object.entries(cropHealthMap)
+            .filter(([_, data]) => data.count > 0 || detectedCrops.has(_)) // Only send relevant crops
+            .map(([name, data]) => {
+                // Determine Risk Level
+                // High frequency of mentions + Negative sentiment = High Risk
+                let riskLevel = "Low";
+                const isNegative = data.sentiment < 0;
+                const hasIssues = data.issues.size > 0;
+
+                if (hasIssues && isNegative) riskLevel = "High";
+                else if (hasIssues || isNegative) riskLevel = "Medium";
+
+                // Determine Trend
+                const yieldTrend = data.sentiment >= 0 ? "up" : "down";
+
+                // Top Issue (Capitalized)
+                const issueList = Array.from(data.issues);
+                const topIssue = issueList.length > 0
+                    ? issueList[0].charAt(0).toUpperCase() + issueList[0].slice(1)
+                    : "None";
+
+                return {
+                    name,
+                    risk: riskLevel,
+                    disease: topIssue,
+                    yieldTrend,
+                    volume: data.count
+                };
+            })
+            .sort((a, b) => b.volume - a.volume) // Sort by relevance/volume
+            .slice(0, 5); // Take top 5
+
         const insight = feed.items[0]?.title || `No recent major headlines for ${country}.`;
 
         return NextResponse.json({
@@ -129,9 +216,10 @@ export async function GET(request: Request) {
             sentimentScore: parseFloat(avgSentiment.toFixed(2)),
             trend: trends[0],
             insight,
-            crops: Array.from(detectedCrops).slice(0, 5), // Top 5 relevant crops
+            crops: Array.from(detectedCrops).slice(0, 5),
+            cropHealth: cropHealth.length > 0 ? cropHealth : null, // New Real-time Field
             aiNews: aiFeed.items.slice(0, 3).map(i => ({ title: i.title, link: i.link })),
-            concerns: density, // { weather: 45, price: 12, pest: 0 }
+            concerns: density,
             weather: weather ? {
                 temp: weather.current_weather.temperature,
                 condition: weather.current_weather.weathercode,

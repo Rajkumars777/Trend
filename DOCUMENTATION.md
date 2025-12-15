@@ -1,343 +1,173 @@
-# Agri-Trend Analytics Platform - Technical Documentation
+# Agri-Trend Analytics Platform: A Context-Aware Agricultural Market Intelligence System
 
-## 1. Project Overview
-The **Agri-Trend Analytics Platform** is an intelligent system designed to provide real-time insights into agricultural markets. It bridges the gap between **quantitative market data** (prices, exchange rates) and **qualitative social signals** (farmer sentiment, discussions) to forecast trends.
+## Table of Contents
+1. [Abstract](#abstract)
+2. [Background](#background)
+3. [Research Context](#research-context)
+4. [Problem Statement](#problem-statement)
+5. [Proposed Solution](#proposed-solution)
+6. [Project Structure](#project-structure)
+7. [System Architecture & Workflow](#system-architecture--workflow)
+8. [Detailed Implementation Guide](#detailed-implementation-guide)
+9. [Functional Features](#functional-features)
+10. [Future Scope](#future-scope)
 
-**Core Mission:** To predict agricultural market shifts by analyzing the correlation between social sentiment and market indicators.
+---
 
-## 2. System Architecture & Workflows
+## Abstract
+The agricultural sector is inherently volatile, subject to rapid fluctuations driven by weather anomalies, geopolitical shifts, and policy changes. Traditional market analysis often relies on lagging quantitative indicators, failing to capture the real-time "pulse" of the farming community. This project, the **Agri-Trend Analytics Platform**, presents a novel approach to market intelligence by fusing quantitative financial data (Global Futures, Exchange Rates) with qualitative social signals (Social Media, News, Video Content). Utilizing advanced Natural Language Processing (NLP) techniques—specifically Zero-Shot Classification and Sentiment Analysis—the system decodes unstructured discourse to predict market sentiment trends. The result is a unified dashboard that empowers stakeholders with real-time holistic insights, bridging the gap between global market prices and ground-level reality.
 
-### End-to-End Workflow
-The system operates on a strictly linear "Extract-Transform-Load-Analyze" (ETLA) pipeline model. This linearity ensures data integrity and simplifies debugging by creating clear state transitions.
+---
 
-1.  **Data Ingestion (Raw Input)**
-    *   **Action**: The system polls external APIs (Yahoo Finance for market data, World Bank for economic stats) and scrapes social platforms (Reddit for unstructured text).
-    *   **Input State**: Disparate, unstructured JSON and raw HTML/Text.
-    *   **Output State**: Raw documents stored in memory or temporary buffers.
+## Background
+Agriculture remains the backbone of many developing economies, contributing significantly to GDP (e.g., ~16% in India) and employment. However, the sector is plagued by **information asymmetry**. While institutional traders have access to Bloomberg terminals and satellite data, local farmers and policymakers often rely on delayed reports or anecdotal evidence.
 
-2.  **Normalization (Standardization)**
-    *   **Action**: Disparate data formats are unified. Currencies are normalized to USD baselines before local conversion. Text is stripped of URLs, special characters, and non-alphanumeric noise to prepare for NLP.
-    *   **Input State**: Raw mixed-format data.
-    *   **Output State**: Cleaned strings and standardized numerical objects.
+In recent years, the "financialization" of agriculture has meant that a drought in Brazil can spike Soybean prices in Southeast Asia within hours. Simultaneously, social media has become a town square where early warnings of pest attacks, fertilizer shortages, or unrest are first broadcast. Ignoring these digital signals results in an incomplete picture of market health.
 
-3.  **AI Enrichment (Intelligence Injection)**
-    *   **Action**: Clean data is passed through the `AgriAIClient`.
-        *   *Classification*: Determines if content is "Agricultural" vs "Noise".
-        *   *Sentiment Analysis*: Assigns a polarity vector (-1.0 to +1.0).
-        *   *Topic Modeling*: Tags content with categories like "Weather" or "Policy".
-    *   **Input State**: Clean text.
-    *   **Output State**: Annotated JSON documents (`posts` collection) containing metadata like `sentiment_score` and `detected_keywords`.
+---
 
-4.  **Statistical Forecasting (Temporal Projection)**
-    *   **Action**: The system aggregates enriched sentiment scores by day. A Linear Regression model is trained on this time-series data to extrapolate the trend line for the upcoming 7 days.
-    *   **Input State**: Time-series historical data.
-    *   **Output State**: Future date-value pairs (`forecasts` collection).
+## Research Context
+Existing literature in *Computational Social Science* and *Agri-Economics* highlights two distinct silos:
+1.  **Econometric Models**: Use historical price/volume data to forecast futures (ARIMA, LSTM). These fail during "Black Swan" events like policy bans or sudden weather shocks.
+2.  **Sentiment Analysis**: Used primarily in stock trading (e.g., predicting Tesla stock from Tweets). Its application in agriculture is nascent but promising, as proven by studies linking query volumes (Google Trends) to commodity prices.
 
-5.  **Visualization (Consumption)**
-    *   **Action**: The Next.js frontend fetches the pre-processed and forecasted data via internal APIs to render interactive maps, trend charts, and alerts.
-    *   **Input State**: Structured database records.
-    *   **Output State**: User-facing React components and SVG visualizations.
+This project sits at the intersection of these fields, treating "Farmer Sentiment" as a leading indicator for "Market Health".
 
-### Phase 1: Data Gathering (Ingestion)
-**File:** `scripts/agri_pipeline.py` (Function: `fetch_all`)
+---
 
-> **⚡ Real-Time Data Strategy**
-> The platform operates on a "Poll-and-Push" model. The pipeline runs periodically (or on-demand) to fetch specific "Live" data points vs "Static" indicators.
->
-> | Data Domain | Source | Real-Time Mechanism | Refresh Rate/Trigger |
-> | :--- | :--- | :--- | :--- |
-> | **Market Prices** | **Yahoo Finance** | Live Futures (`ZR=F`) & FX Tickers (`INR=X`) | On every pipeline execution |
-> | **Weather** | **OpenWeatherMap / WeatherAPI** | API Call (Current Conditions) | On-demand (page load or pipeline) |
-> | **Social (Reddit)** | **Reddit JSON Search** | Polls `new` feed for specific keywords | Batch poll (e.g., every 1-6 hrs) |
-> | **News** | **Google News RSS** | RSS Feed Parsing (`pubDate` sort) | Batch poll |
-> | **Video** | **YouTube Search** | HTML Scraping (Latest uploads) | Batch poll |
-> | **Economic Stats** | **World Bank** | Annual/Quarterly API Updates | Static (Annual cache) |
+## Problem Statement
+**"The Disconnect between Market Prices and Ground Reality."**
 
-#### Live Execution Flow
-When `python scripts/agri_pipeline.py fetch` is run:
-1.  **Synchronous**: The script contacts `yfinance` to get the *exact* market price at that second.
-2.  **Synchronous**: It calls Weather APIs for the latest temp/rain in capital cities.
-3.  **Asynchronous/Batch**: It iterates through keywords (`Rice`, `Wheat`) to pull the latest 10-20 posts from Social/News sources that appeared since the last run.
+Stakeholders currently face three critical challenges:
+1.  **Latency**: Official agricultural reports are often weeks old by the time they are published.
+2.  **Noise**: The internet is flooded with unstructured data; distinguishing a relevant post about "Wheat Rust" from a video game discussion is difficult.
+3.  **Fragmentation**: Price data sits in financial portals (Yahoo Finance), while sentiment data sits in social silos (Reddit, YouTube), making correlation impossible.
 
-### Detailed Source Breakdown
-**File:** `scripts/agri_pipeline.py` (Function: `fetch_all`)
+There is no unified system that answers: *"Prices are up, but are farmers actually happy, or is this a panic spike?"*
 
-The system aggregates data from three distinct sources using the following specifications:
+---
 
-#### 1. Global Financial & Market Data
-*   **Source**: Yahoo Finance (`yfinance`).
-*   **Method**: Live Futures Aggregation + Currency Conversion.
-*   **Process**:
-    1.  Fetch Global Futures (e.g., Chicago Wheat `ZW=F`, Rough Rice `ZR=F`).
-    2.  Fetch Real-time Exchange Rates (e.g., `USD` -> `INR`).
-    3.  **Real-Time Price Calculation**: `Futures_Price * Exch_Rate * Unit_Conversion_Factor * Local_Premium`
-*   **Data Extracted**:
-    *   `INR=X`, `JPY=X`, `PHP=X`
-    *   Commodity Tickers: `ZR=F`, `ZW=F`, `ZC=F`, `ZS=F`, `CT=F`
-*   **Example Data**:
-    ```json
-    { 
-      "commodity": "Rice (Basmati)", 
-      "price": "₹3850.45", 
-      "source": "Live Futures",
-      "trend": "+1.2%" 
-    }
-    ```
+## Proposed Solution
+We propose an **Integrated Market Intelligence System** that automates the ETL (Extract, Transform, Load) process for agricultural data.
 
-    > **Real-Time Note**: This system now dynamically fetches live futures (e.g., `ZR=F` for Rice) and localized currency rates (`INR=X`, `JPY=X`) instead of using static configuration.
+**Key Innovations:**
+*   **Hybrid Data Ingestion**: Simultaneously polls Live Futures (Quantitative) and Social Feeds (Qualitative).
+*   **AI-Driven Context Awareness**: dynamic filtering of noise using Zero-Shot Classification ensuring only relevant agricultural discourse is analyzed.
+*   **Real-Time Localization**: Auto-converts global benchmarks (e.g., Chicago Board of Trade Wheat Prices) into local currency and units (e.g., INR/Quintal) for actionable local context.
+*   **Predictive Dashboard**: A Next.js-based visualization layer that maps sentiment trends against price movements.
 
-#### 2. Socio-Economic Indicators & Weather
-*   **Source**: World Bank Open Data & OpenWeatherMap.
-*   **Method**: REST API.
-*   **Authentication**: 
-    -   World Bank: **Open Data** (No Key).
-    -   Weather: **API Key Required** (`OPENWEATHER_API_KEY` in `.env.local`).
-*   **Process**: 
-    -   Queries specific indicators like `NV.AGR.TOTL.ZS` (Agri GDP %).
-    -   Fetches real-time temperature and rainfall for capital cities.
-*   **Example Response**:
-    ```json
-    { "country": "India", "gdp_share_agri": 16.5, "weather": {"temp": 32.5, "rain": 0.0} }
-    ```
+---
 
-#### 3. Social Discourse (Qualitative)
-*   **Source**: Reddit
-*   **Method**: Public Search JSON Endpoint (Scraping).
-*   **Endpoint**: `https://www.reddit.com/search.json?q={query}`
-*   **Authentication**: **None** (User-Agent header only).
-    *   *Note*: While `snoowrap` is in the package mainly for future auth, the current script uses direct HTTP requests for simpler zero-setup access.
-*   **Extraction Process**:
-    1.  Construct query from keywords: `"Rice OR Wheat OR Farming"`.
-    2.  Fetch JSON feed.
-    3.  Normalize `data.children[].data` into internal Post format.
-*   **Input Example (Raw)**:
-    ```json
-    {
-       "title": "Soy powder plant will process more Ontario beans at home",
-       "selftext": "",
-       "score": 5,
-       "subreddit": "farming",
-       "created_utc": 1733507445.0,
-       "author": "MennoniteDan"
-    }
-    ```
+## Project Structure
+The repository is organized into a clear separation of concerns: Frontend (Visualization) and Backend (Data Pipeline).
 
-#### 4. Google News
-*   **Source**: Google News RSS
-*   **Method**: XML Parsing (`xml.etree`).
-*   **Endpoint**: `https://news.google.com/rss/search?q={QUERY}`
-*   **Authentication**: **Public RSS** (No Key).
-*   **Process**: Parses `<item>` tags for title and publication date.
-*   **Example Data**:
-    ```json
-    {
-      "title": "Global Rice Prices Hit 15-Year High",
-      "source": "news",
-      "url": "https://news.google.com/..."
-    }
-    ```
-
-#### 5. YouTube (Video Intelligence)
-*   **Source**: YouTube Search Results
-*   **Method**: HTML Regex Extraction (Scraping).
-*   **Endpoint**: `https://www.youtube.com/results?search_query={QUERY}`
-*   **Authentication**: **None** (Public HTML).
-*   **Process**:
-    1.  Fetches search results page.
-    2.  Uses Regex `r'"videoId":"([a-zA-Z0-9_-]{11})"'` to extract video IDs.
-    3.  Constructs valid `youtu.be` links.
-*   **Example Data**:
-    ```json
-    {
-      "title": "YouTube Video: dQw4w9WgXcQ",
-      "content": "Video discussion on agriculture...",
-      "source": "youtube",
-      "url": "https://youtu.be/dQw4w9WgXcQ"
-    }
-    ```
-
-### Phase 2: Data Processing & Feature Extraction (Deep Dive)
-      "url": "https://youtu.be/dQw4w9WgXcQ"
-    }
-    ```
-
-### Phase 2: Data Processing & Feature Extraction (Deep Dive)
-**File:** `scripts/agri_pipeline.py` (Function: `enrich_data`)
-
-This phase transforms unstructured text into structured, queryable data using a multi-stage AI pipeline.
-
-#### Step 1: Text Normalization & Cleaning
-*   **Goal**: Remove noise to improve Model performance.
-*   **Algorithm**: Regex-based string manipulation.
-*   **Actions**:
-    *   Strip URLs (e.g., `https://...` -> ``).
-    *   Remove special occurrences but preserve hashtags (`#Rice` -> `#Rice`).
-    *   Content Truncation: Limiting text to 512 tokens to match Transformer model limits.
-    *   **Transformation Example**:
-        *   *Input*: "Soy powder plant at home! Read more: https://redd.it/xyz"
-        *   *Output*: "Soy powder plant at home!"
-
-#### Step 2: Relevance Filtering (Zero-Shot Classification)
-*   **Goal**: Filter out off-topic posts (e.g., "farming XP" in video games).
-*   **Model**: `facebook/bart-large-mnli` (hosted via Hugging Face API).
-*   **Technique**: **Zero-Shot Learning**. The model is fed the text and a candidate label `["agriculture"]`. It outputs an entailment score.
-*   **Logic**: `IF score("agriculture") > 0.5 THEN Keep ELSE Discard`.
-*   **Transformation Example**:
-    *   *Input*: "Soy powder plant will process more Ontario beans..."
-    *   *Model Output*: `Label: "agriculture", Score: 0.98`
-    *   *Result*: **KEEP** (Relevant)
-
-#### Step 3: Feature Extraction
-
-**A. Sentiment Analysis**
-*   **Goal**: Determine the emotional pole of the text (Positive/Negative/Neutral).
-*   **Model**: `distilbert-base-multilingual-cased-sentiments-student` (Local or Cloud).
-*   **Algorithm**:
-    1.  **Inference**: Model outputs probabilities, e.g., `{"positive": 0.9, "negative": 0.1}`.
-    2.  **Thresholding**: A "Noise Gate" is applied. If the confidence score is `< 0.2`, the sentiment is forced to **Neutral**. This prevents weak/uncertain predictions from skewing the data.
-    3.  **Transformation Example**:
-        *   *Input*: "...process more Ontario beans at home"
-        *   *Model Output*: `Label: "POSITIVE", Score: 0.5624`
-        *   *Check*: `0.5624 > 0.2` (Threshold) -> **Pass**
-        *   *Final Attribute*: `sentiment_class: "Positive"`
-
-**B. Topic Modeling**
-*   **Goal**: Assign a specific category to the post.
-*   **Model**: `facebook/bart-large-mnli` (reused).
-*   **Candidate Labels**: `["Market Prices", "Weather", "Pests & Disease", "Farming Technology", "Government Policy"]`.
-*   **Output**: The label with the highest entailment score is assigned.
-*   **Transformation Example**:
-    *   *Input*: "Soy powder plant..."
-    *   *Candidates*: `["Farming Technology", "Market Prices", ...]`
-    *   *Scores*: `Tech: 0.85, Markets: 0.10, ...`
-    *   *Final Attribute*: `category: "Farming Technology"`
-
-**C. Keyword Extraction**
-*   **Goal**: Identify specific crops or entities.
-*   **Algorithm**: Deterministic lookup.
-*   **Process**: The text is scanned against a predefined `ALL_KEYWORDS` list (e.g., "Rice", "Wheat", "Drought") found in `utils/agri_keywords.py`. Matches are stored in the `detected_keywords` array.
-*   **Transformation Example**:
-    *   *Input*: "Soy powder plant..."
-    *   *Dictionary Lookups*: "Soy" (Found), "Beans" (Found)
-    *   *Result*: `detected_keywords: ["Soy", "Beans"]`
-    *   *(Note: In the final example below, it falls back to Category if no keywords found)*
-
-#### Example: Enriched Social Data Object
-Below is a real-world example of a raw Reddit post after passing through the `enrich_data` pipeline. Note the injected `analysis` object containing AI-derived metadata.
-
-```json
-{
-  "_id": "ObjectId('69342fca31d8c40e50b2f077')",
-  "reddit_id": "reddit_1pf0l1t",
-  "analysis": {
-    "is_relevant": true,
-    "category": "Farming Technology",
-    "sentiment_class": "Positive",
-    "sentiment_score": 0.5624,
-    "confidence": 0.9761,
-    "detected_keywords": ["Farming Technology"]
-  },
-  "author": "MennoniteDan",
-  "content": "Soy powder plant will process more Ontario beans at home",
-  "metrics": {
-    "upvotes": 5,
-    "comments": 0
-  },
-  "source": "reddit",
-  "timestamp": "2025-12-06T17:50:45.000+00:00",
-  "url": "https://www.reddit.com/r/farming/comments/1pf0l1t/soy_powder_plant_wil..."
-}
+```text
+Trend/
+├── .env.local                  # Environment variables (API Keys)
+├── DOCUMENTATION.md            # This System Design Document
+├── package.json                # Frontend Dependencies (Next.js, Tailwind, Recharts)
+├── scripts/                    # [BACKEND] Python ETL & AI Pipeline
+│   ├── agri_pipeline.py        # Main Orchestrator (Data Fetch -> AI -> DB)
+│   ├── download_model.py       # Helper to setup local AI models
+│   └── utils/
+│       ├── ai_client.py        # Wrapper for Hugging Face & Scikit-Learn
+│       ├── world_bank.py       # Connector for Economic Data
+│       ├── agri_keywords.py    # Domain Dictionary
+│       └── logger.py           # Pipeline Observability
+└── src/                        # [FRONTEND] React Application
+    ├── app/                    # Next.js App Router (Pages & API Routes)
+    │   ├── api/                # Internal REST endpoints
+    │   └── page.tsx            # Main Dashboard Controller
+    ├── components/             # Reusable UI Widgets
+    │   ├── GlobalMap.tsx       # D3.js Geo-Visualization
+    │   ├── StatCard.tsx        # KPI Display
+    │   └── ...
+    └── lib/                    # Shared Utilities (MongoDB Connection)
 ```
 
-### Phase 3: Insight Generation & Forecasting
-**File:** `scripts/agri_pipeline.py` (Function: `forecast_trends`)
+---
 
-This phase turns structured data into predictive insights.
--   **Aggregation**: Sentiment scores are averaged daily.
--   **Modeling**: A **Linear Regression Model** (Scikit-Learn) fits a trend line to the daily sentiment averages.
--   **Prediction**: The model extrapolates sentiment outcomes for the next **7 days**.
+## System Architecture & Workflow
 
-#### Example: Aggregation & Prediction
-How the single "Soy powder" post contributes to the trend:
+The system follows a linear **ETLA (Extract - Transform - Load - Analyze)** pipeline.
 
-1.  **Input**: Post `reddit_1pf0l1t` (Sentiment: `0.5624`).
-2.  **Daily Aggregation (2025-12-06)**:
-    *   Post A: `0.5624`
-    *   Post B: `-0.1200`
-    *   Post C: `0.3300`
-    *   **Day Average**: `(0.5624 - 0.12 + 0.33) / 3 = 0.257`
-3.  **Model Fitting**:
-    *   `X = [Day 1, Day 2, Day 3]` // `Y = [0.10, 0.15, 0.257]`
-    *   *Slope* is positive -> Trend is **UP**.
-4.  **Forecast Output**:
-    ```json
-    { "date": "2025-12-13", "predicted_sentiment": 0.35, "confidence": "High" }
-    ```
+### Step 1: Extraction (Data Ingestion)
+The `fetch_all()` function in `agri_pipeline.py` triggers concurrent collectors:
+*   **Financials**: Queries `yfinance` for realtime tickers:
+    *   *Commodities*: Rough Rice (`ZR=F`), Wheat (`ZW=F`), Corn (`ZC=F`), Soybean (`ZS=F`).
+    *   *Forex*: `INR=X`, `JPY=X`, `PHP=X`.
+*   **Social Web**:
+    *   *Reddit*: Scrapes `r/farming`, `r/agriculture` using JSON endpoints.
+    *   *YouTube*: Scrapes search results for query "harvest forecast".
+    *   *News*: Parses Google News RSS feeds.
+*   **Macro-Economics**: Pulls GDP and Arable Land stats from the World Bank API.
 
-    { "date": "2025-12-13", "predicted_sentiment": 0.35, "confidence": "High" }
-    ```
+### Step 2: Transformation (Normalization)
+Raw data is cleaned to ensure consistency:
+*   **Text Cleaning**: Regex removal of URLs and non-ASCII characters.
+*   **Unit Conversion**: 
+    *   *Input*: Wheat (USD/Bushel).
+    *   *Process*: `(Price / 27.21kg) * ExchangeRate * LocalPremium`.
+    *   *Output*: Wheat (INR/Quintal) or (JPY/Ton).
 
-#### Latest Data Count (Live 2025)
-*   **Total Posts**: ~3,300+
-*   **Sources**: Reddit, Google News, YouTube
-*   **Forecast Horizon**: 7 Days
+### Step 3: Intelligence (AI Enrichment)
+Handled by `utils/ai_client.py`, passing content through two models:
+1.  **Relevance Filter (Zero-Shot)**:
+    *   *Model*: `facebook/bart-large-mnli`
+    *   *Task*: Classify text as "Agriculture" or "Noise".
+    *   *Decision*: If Score < 0.5, discard.
+2.  **Sentiment & Topic Analysis**:
+    *   *Model*: `distilbert-base-multilingual-cased-sentiments-student`
+    *   *Task*: Assign Sentiment (-1 to +1) and Topic (e.g., "Policy", "Weather").
+
+### Step 4: Loading (Storage)
+Enriched data is upserted into **MongoDB** collections:
+*   `posts`: Individual pieces of content with sentiment scores.
+*   `country_stats`: Aggregated economic and price snapshots.
+*   `forecasts`: Predicted trend vectors.
+
+### Step 5: Visualization (Frontend)
+The Next.js application polls the MongoDB database via internal APIs (`src/app/api/`) to render:
+*   **Global Map**: Color-coded by country sentiment.
+*   **News Ticker**: Scrolling feed of latest high-relevance posts.
+*   **Word Cloud**: Most frequent entities (e.g., "Drought", "MSP").
 
 ---
 
-## 3. Machine Learning & AI Usage (Deep Dive)
+## Detailed Implementation Guide
 
-The project employs a **Hybrid AI Strategy** combining local lightweight models with powerful cloud-based inference.
+### A. The Python Pipeline (`scripts/`)
+This is the core engine. It is designed to be run as a CRON job or scheduled task.
+1.  **`fetch_all`**: The entry point. It orchestrates the gathering of data. It ensures that even if one source (e.g., Reddit) fails, others (Prices, Weather) continue to update.
+2.  **`enrich_data`**: A distinct phase that can be run on a separate GPU worker. It iterates over "raw" posts in the DB and stamps them with AI metadata.
+3.  **`forecast_trends`**: Uses **Linear Regression**. It groups sentiment by date, calculates the slope of the trend line, and projects 7 days into the future.
 
-### A. The AI Client (`scripts/utils/ai_client.py`)
-This is the brain of the operation. It manages model loading, inference, and fallback logic.
-
-#### 1. Zero-Shot Classification (Cloud API)
-*   **Model**: `facebook/bart-large-mnli` (via Hugging Face Inference API).
-*   **Technique**: Zero-Shot Learning.
-*   **Usage**: 
-    -   **Relevance**: The model is asked "Is this text about agriculture?". It outputs a probability score.
-    -   **Topic Modeling**: The model classifies text into candidate labels: `["Market Prices", "Weather", "Pests & Disease", "Farming Technology", "Government Policy"]` without needing specific training on these categories.
-
-#### 2. Sentiment Analysis (Hybrid Local/Cloud)
-*   **Primary Model (Local)**: A distilled BERT model (e.g., `distilbert-base-multilingual-cased-sentiments-student`) stored in `models/sentiment-model`.
-*   **Fallback**: If the local model is missing, it dynamically downloads from Hugging Face.
-*   **Logic**:
-    -   Input: Text chunk (< 512 tokens).
-    -   Output: Label (Positive/Negative/Neutral) and Confidence Score.
-    -   **Thresholding**: A custom threshold (`0.2`) acts as a noise gate. Weak sentiments are forced to "Neutral" to prevent false signals.
-
-#### 3. Keyword Extraction (Rule-Based)
-*   **Technique**: Pattern matching against a domain-specific dictionary (`scripts/utils/agri_keywords.py`).
-*   **Logic**: Scans text for high-value terms (e.g., "Drought", "Harvest", "Subsidy") and Hashtags.
+### B. The User Interface (`src/`)
+Built with **Next.js 15 (App Router)** and **Tailwind CSS**.
+*   **`GlobalMap.tsx`**: Uses `react-simple-maps` and `d3-scale`. It visually represents the "mood" of a nation—Green for positive sentiment, Red for negative.
+*   **`LiveHeader.tsx`**: Displays real-time context (Time, Weather) to ground the user in the "now".
+*   **`InfluencerTable.tsx`**: Identifies key opinion leaders by aggregating engagement metrics (upvotes, comments) per author.
 
 ---
 
-## 4. File-by-File Technical Guide
+## Functional Features
 
-### Backend (`scripts/`)
-| File | Responsibility | Key Functions |
-| :--- | :--- | :--- |
-| `agri_pipeline.py` | **Orchestrator**. The main entry point. Fetches data (News, Reddit, YouTube, Prices), runs enrichment loops, and triggers forecasting. | `fetch_all()`, `enrich_data()`, `forecast_trends()` |
-| `utils/ai_client.py` | **Intelligence**. Wraps all ML operations. Handles API calls to Hugging Face and local model inference. | `analyze(text)`, `_query()` |
-| `utils/world_bank.py` | **Data Connector**. Interface for the World Bank Open Data API. | `fetch_all_stats()`, `get_indicator()` |
-| `utils/agri_keywords.py` | **Knowledge Base**. Static lists of agricultural terms and hashtags used for search and extraction. | `ALL_KEYWORDS`, `HASHTAGS` |
-| `utils/logger.py` | **Observability**. Standardized logging for pipeline tracking. | `start_run()`, `log_step()` |
+### 1. Real-Time Price Engine
+Unlike static dashboards, this system calculates prices on the fly. It knows that 1 Bushel of Wheat = 27.2 kg and applies dynamic logic:
+> `Local Price = Global Futures Price × USD Conversion × Local Market Premium`
 
-### Frontend (`src/`)
-| File | Responsibility |
-| :--- | :--- |
-| `src/app/page.tsx` | **Dashboard Controller**. Aggregates data from APIs and renders the main view. |
-| `src/app/api/` | **Data Access Layer**. Exposes MongoDB data to the frontend via secure REST endpoints. |
+### 2. Sentiment "Noise Gate"
+The AI doesn't just accept every prediction. A thresholding logic (`confidence > 0.2`) forces weak predictions to "Neutral". This prevents the dashboard from being jumpy or reactive to ambiguous text.
+
+### 3. Topic Modeling
+The system automatically categorizes chaos into order. A thousand tweets are distilled into buckets: "40% talking about Weather", "30% talking about Prices", "20% talking about Government Policy".
 
 ---
 
-## 5. Functional Features
+## Future Scope
 
-### 1. Global Market Monitor
-Visualize agricultural health across India, Japan, and the Philippines with real-time currency conversion and localized commodity price estimation.
+1.  **Multimodal Analysis**: Integrating Satellite Imagery (NDVI) to correlate "Brown pixels" (vegetation stress) with "Negative Tweets".
+2.  **LLM Integration**: Replacing the Zero-Shot classifier with a fine-tuned LLaMA model for "Chat with Data" capabilities (e.g., "Ask the dashboard: Why is rice expensive today?").
+3.  **WhatsApp Integration**: Sending low-bandwidth SMS/WhatsApp alerts to farmers in remote areas based on the dashboard's findings.
 
-### 2. Early Warning System
-By tracking the **Derivative of Sentiment** (rate of change in sentiment), the system can flag potential crises (e.g., a sudden spike in "Weather" negativity indicating crop failure) before official reports isssue.
-
-### 3. Predictive Trend Analysis
-The linear regression visualizer shows not just where the market *is*, but where public perception is *heading*, allowing for proactive decision-making.
+---

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import GlobalMap from '@/components/GlobalMap';
 import YieldForecast from '@/components/YieldForecast';
 import EnvironmentalCharts from '@/components/EnvironmentalCharts';
 import CountrySelector from '@/components/CountrySelector';
 import AgricultureOverview from '@/components/AgricultureOverview';
 import MarketEconomy from '@/components/MarketEconomy';
-import SocialSentiment from '@/components/SocialSentiment';
+import SmartCropCard from '@/components/SmartCropCard';
+import MarketAnalysis from '@/components/MarketAnalysis';
+
 import CropDeepDive from '@/components/CropDeepDive';
 import SingleCountryMap from '@/components/SingleCountryMap';
 import { TrendingUp, AlertTriangle, Sprout, Wind, Droplets, Thermometer, DollarSign, Bug, CloudRain, Cpu, Globe, ChevronRight } from 'lucide-react';
@@ -53,6 +55,48 @@ export default function CountryStatsPage() {
                 setDeepLoading(false);
             });
     }, [selectedCountry]);
+
+    // Intelligent Crop Recommendation Engine
+    const smartRecommendation = useMemo(() => {
+        if (!deepData?.market?.prices) return null;
+
+        // 1. Find Best Market Trend
+        const marketWinner = [...deepData.market.prices]
+            .filter((p: any) => p.trend.includes('+'))
+            .sort((a: any, b: any) => {
+                const valA = parseFloat(a.trend.replace('%', '').replace('+', ''));
+                const valB = parseFloat(b.trend.replace('%', '').replace('+', ''));
+                return valB - valA;
+            })[0];
+
+        if (!marketWinner) return null;
+
+        // 2. Check Risk Profile
+        const cropName = marketWinner.commodity.split(' ')[0];
+        const healthProfile = insightData?.cropHealth?.find((c: any) => c.name.includes(cropName) || cropName.includes(c.name));
+
+        const riskLevel = healthProfile ? healthProfile.risk : "Low";
+        const riskReason = healthProfile ? healthProfile.disease : "None";
+
+        // 3. Calculate Score
+        let trendVal = parseFloat(marketWinner.trend.replace('%', '').replace('+', ''));
+        if (isNaN(trendVal)) trendVal = 5;
+
+        let score = 50 + (trendVal * 2);
+        if (riskLevel === 'Medium') score -= 15;
+        if (riskLevel === 'High') score -= 30;
+
+        if (score > 98) score = 98.5;
+        if (score < 40) score = 42.0;
+
+        return {
+            crop: marketWinner.commodity,
+            score: parseFloat(score.toFixed(1)),
+            reason: `Strong Market Upside (${marketWinner.trend})`,
+            risk: riskLevel,
+            riskReason: riskReason
+        };
+    }, [deepData, insightData]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-12 bg-gray-50 dark:bg-[#0B1221] min-h-screen p-8 transition-colors duration-300">
@@ -168,14 +212,26 @@ export default function CountryStatsPage() {
                 {/* Right Column: Economy, Social, Risks (1/3 width) */}
                 <div className="space-y-6">
 
+                    {/* Intelligent Crop Recommendation */}
+                    {smartRecommendation && <SmartCropCard recommendation={smartRecommendation} />}
+
                     {/* Market & Economy */}
                     <MarketEconomy data={deepData} loading={deepLoading} />
 
-                    {/* Social Sentiment */}
-                    <SocialSentiment data={deepData} loading={deepLoading} />
+                    {/* Advanced Market Analysis (Volatility & Forecasts) */}
+                    {deepData?.market?.analysis && (
+                        <div className="col-span-full">
+                            <MarketAnalysis
+                                volatility={deepData.market.analysis.volatility}
+                                allForecasts={deepData.market.analysis.allForecasts}
+                                movers={deepData.market.analysis.movers}
+                            />
+                        </div>
+                    )}
+
 
                     {/* Crop Deep Dive */}
-                    <CropDeepDive />
+                    <CropDeepDive data={insightData?.cropHealth} />
 
                     {/* Concern Density Heatmap */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm transition-all duration-300">

@@ -102,7 +102,25 @@ export default function Dashboard() {
 
   const avgSentiment = trends.length > 0
     ? (trends.reduce((acc: number, curr: any) => acc + curr.sentiment, 0) / trends.length).toFixed(2)
-    : 0;
+    : "0";
+
+  // Dynamic Forecast Calculation
+  const sentimentValue = parseFloat(avgSentiment);
+  let forecastIndex = "Stable";
+  let forecastDirection: "up" | "down" = "up";
+
+  if (sentimentValue >= 0.3) {
+    forecastIndex = "Positive";
+    forecastDirection = "up";
+  } else if (sentimentValue <= -0.3) {
+    forecastIndex = "Negative";
+    forecastDirection = "down";
+  } else {
+    forecastIndex = "Stable";
+    // If slightly negative but not critical, maybe show down? Sticking to stable/up for simplicity or refinement:
+    forecastDirection = sentimentValue >= 0 ? "up" : "down";
+  }
+
 
   return (
     <div className="space-y-4">
@@ -132,8 +150,8 @@ export default function Dashboard() {
         negativeCount={negativeCount}
         neutralCount={neutralCount}
         topCrop={trendingTopics[0] || "Mixed"}
-        forecastIndex="Stable"
-        forecastDirection="up"
+        forecastIndex={forecastIndex}
+        forecastDirection={forecastDirection}
         dailyTrend={[]}
       />
 
