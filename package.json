@@ -32,6 +32,7 @@
     "react-tooltip": "^5.30.0",
     "recharts": "^3.5.0",
     "remark-gfm": "^4.0.1",
+    "rss-parser": "^3.13.0",
     "sentiment": "^5.0.2",
     "snoowrap": "^1.23.0",
     "tailwind-merge": "^3.4.0",
