@@ -102,6 +102,7 @@ export default function MarketPage() {
                 forecasts={marketData.forecasts}
                 allForecasts={marketData.allForecasts}
                 movers={marketData.movers}
+                country={selectedCountry}
             />
 
             {/* Predictions Grid */}

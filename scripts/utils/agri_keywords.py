@@ -1,83 +1,81 @@
 
 # 1. GENERAL AGRICULTURE KEYWORDS (VERY HIGH VOLUME)
+# 1. GENERAL AGRICULTURE KEYWORDS (VERY HIGH VOLUME)
 GENERAL_KEYWORDS = [
     "agriculture", "farming", "farmers", "farm life", "rural", "agri news",
     "agri update", "harvest", "crop yield", "cultivation", "food production",
     "agri market", "sustainable farming", "organic farming", "precision agriculture",
-    "agritech", "agricultural crisis", "food security"
+    "agritech", "agricultural crisis", "food security", "agribusiness", "horticulture",
+    "livestock management", "dairy farming", "poultry farming", "aquaculture"
 ]
 
-# 2. CROP-SPECIFIC KEYWORDS
+# 2. CROP-SPECIFIC KEYWORDS (STAPLES & CASH CROPS)
 CROP_KEYWORDS = [
-    "Rice", "rice farming", "paddy cultivation", "rice yield", "rice price", "paddy farmers",
-    "Wheat", "wheat farming", "wheat price", "wheat yield", "heat stress wheat",
-    "Maize", "corn", "maize farming", "corn cultivation", "maize price",
-    "Sugarcane", "sugarcane farmers", "cane price", "sugarcane yield",
-    "Cotton", "cotton farming", "cotton price", "bollworm", "pink bollworm attack",
-    "Tomato", "tomato price", "Onion", "onion farming", "Potato", "potato cultivation",
-    "vegetable market price"
+    "Rice farming", "paddy cultivation", "rice yield", "rice price", "basmati rice",
+    "Wheat farming", "wheat harvest", "wheat price", "wheat varieties",
+    "Maize cultivation", "corn farming", "corn price", "maize yield",
+    "Sugarcane farming", "sugar prices", "ethanol production",
+    "Cotton farming", "bt cotton", "cotton price", "cotton pests",
+    "Soybean farming", "soybean prices", "oilseeds", "mustard farming",
+    "Potato farming", "onion prices", "tomato prices", "vegetable cultivation",
+    "Coffee plantation", "tea garden", "rubber plantation", "spices farming"
 ]
 
-# 3. WEATHER-RELATED KEYWORDS
+# 3. WEATHER & CLIMATE
 WEATHER_KEYWORDS = [
-    "monsoon", "rainfall shortage", "drought", "flood", "cyclone", "heatwave",
-    "unseasonal rain", "climate impact farming", "weather impact crops",
-    "soil moisture", "el nino farming", "la nina farming"
+    "monsoon forecast", "rainfall deficit", "drought conditions", "flood damage crops",
+    "heatwave agriculture", "unseasonal rain", "hailstorm crop damage",
+    "climate change agriculture", "el nino impact", "la nina impact", "frost damage"
 ]
 
-# 4. PEST & DISEASE KEYWORDS
+# 4. PESTS, DISEASES & PROTECTION
 PEST_DISEASE_KEYWORDS = [
-    "pest outbreak", "locust attack", "fall armyworm", "bollworm", "crop disease",
-    "fungal infection crops", "pest infestation", "plant disease outbreak"
+    "locust attack", "fall armyworm", "pink bollworm", "whitefly control",
+    "fungal diseases", "bacterial blight", "crop protection", "pesticide resistance",
+    "integrated pest management", "bio-pesticides", "weed control"
 ]
 
-# 5. PRICE & MARKET KEYWORDS
+# 5. MARKET, ECONOMY & POLICY
 MARKET_KEYWORDS = [
-    "crop price", "mandi prices", "MSP", "agricultural market", "produce selling price",
-    "farm income", "vegetable price hike", "inflation food", "market rate today"
+    "mandi prices", "APMC market", "MSP rates", "minimum support price",
+    "farm export ban", "agri commodities", "food inflation", "fertilizer subsidy",
+    "crop insurance", "PM Fasal Bima Yojana", "agricultural loan waiver",
+    "farmer protests", "farm laws", "agriculture budget"
 ]
 
-# 6. FARM INPUTS
-INPUT_KEYWORDS = [
-    "fertilizer shortage", "urea shortage", "DAP shortage", "NPK fertilizer", "fertilizer price",
-    "seed quality", "hybrid seeds", "pesticide shortage", "pesticide price", "insecticide"
-]
-
-# 7. GOVERNMENT POLICY
+# --- NEW: POLICY KEYWORDS (For AI Client Compatibility) ---
 POLICY_KEYWORDS = [
-    "MSP policy", "PM Kisan", "agriculture subsidy", "farm bill", "government scheme farmers",
-    "farmer protest", "loan waiver", "minimum support price"
+    "subsidy", "subsidies", "loan", "govt", "government", "bill", "act",
+    "scheme", "ministry", "policy", "export ban", "import duty"
 ]
 
-# 8. TECHNOLOGY
+# 6. TECHNOLOGY & MODERN FARMING
 TECH_KEYWORDS = [
-    "agritech", "drone farming", "digital agriculture", "satellite farming",
-    "precision farming", "IoT in agriculture", "smart irrigation",
-    "vertical farming", "hydroponics", "AI in agriculture", "machine learning farming"
+    "agritech startups", "drone spraying", "agricultural drones", "smart irrigation",
+    "IoT in agriculture", "satellite imagery farming", "soil health card",
+    "vertical farming", "hydroponics", "aquaponics", "regenerative agriculture",
+    "carbon farming", "precision planting", "farm mechanization", "electric tractors"
 ]
 
-# 9. FARMING OPERATIONS
+# 7. FARM INPUTS
+INPUT_KEYWORDS = [
+    "urea shortage", "DAP fertilizer price", "nano urea", "organic fertilizer",
+    "hybrid seeds", "GM crops", "seed availability", "fodder shortage",
+    "diesel price", "petrol price", "fuel cost"
+]
+
+# --- NEW: OPERATION KEYWORDS (For AI Client Compatibility) ---
 OPERATION_KEYWORDS = [
-    "irrigation problem", "water scarcity", "soil erosion", "crop failure",
-    "yield loss", "farm labour shortage", "tractor farming", "harvesting issues"
+    "yield", "yields", "sowing", "planting", "harvest", "harvesting", 
+    "irrigation", "ploughing", "threshing"
 ]
 
-
-
-# HASHTAGS (for Twitter/Social Media specifically)
-HASHTAGS = [
-    "agriculture", "farming", "farmers", "agrinews", "agritech", "organicfarming",
-    "monsoon", "heatwave", "drought", "floodalert",
-    "ricefarmers", "cottonfarmers", "wheatfarmers",
-    "mandiprice", "cropprice", "foodinflation",
-    "dronesinagriculture", "precisionfarming"
-]
-
-# Combine all for broad searches or random selection
+# Combine all for broad searches
+# For scrapers, we will use this master list
 ALL_KEYWORDS = (
     GENERAL_KEYWORDS + CROP_KEYWORDS + WEATHER_KEYWORDS + 
-    PEST_DISEASE_KEYWORDS + MARKET_KEYWORDS + INPUT_KEYWORDS + 
-    POLICY_KEYWORDS + TECH_KEYWORDS + OPERATION_KEYWORDS
+    PEST_DISEASE_KEYWORDS + MARKET_KEYWORDS + TECH_KEYWORDS + INPUT_KEYWORDS +
+    POLICY_KEYWORDS + OPERATION_KEYWORDS
 )
 
 # --- CONSTANTS MOVED FROM fetch_agri_data.py ---

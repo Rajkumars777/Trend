@@ -23,6 +23,7 @@ try:
     from utils.agri_keywords import ALL_KEYWORDS
     from utils.logger import PipelineLogger
     from utils.world_bank import WorldBankClient
+    from social_media_pipeline import run_social_pipeline
 except ImportError:
     print("❌ Error: Could not import utils. Make sure 'scripts/utils' exists.")
     sys.exit(1)
@@ -304,186 +305,9 @@ def generate_country_data(country_name, rates, global_market):
     }
 
 # ==========================================
-# 2. DATA FETCHING (SOCIAL & MEDIA)
+# 2. DATA FETCHING (SOCIAL & MEDIA) - MOVED TO social_media_pipeline.py
 # ==========================================
 
-def display_source_header(source_name):
-    print(f"   🔹 Fetching {source_name}...")
-
-def fetch_reddit():
-    display_source_header("Reddit (RSS)")
-    # Use a realistic browser User-Agent to avoid 429/403
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-    
-    # Use ALL_KEYWORDS from utils if available, else fallback
-    try:
-        from utils.agri_keywords import ALL_KEYWORDS
-        chunk = ALL_KEYWORDS[:5]
-    except ImportError:
-        chunk = ["agriculture", "farming", "harvest", "crops", "farmers"]
-        
-    query = " OR ".join([f'"{k}"' for k in chunk])
-    # URL encoded query
-    import urllib.parse
-    encoded_query = urllib.parse.quote(query)
-    url = f"https://www.reddit.com/search.rss?q={encoded_query}&sort=new&limit=10"
-
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        
-        if resp.status_code != 200:
-            print(f"      ⚠️ Reddit Blocked/Error: {resp.status_code}")
-            return 0
-            
-        # Parse XML (Atom Feed)
-        root = ET.fromstring(resp.content)
-        # Namespace map for Atom
-        ns = {'atom': 'http://www.w3.org/2005/Atom'}
-        
-        # Find entries (handling namespace)
-        entries = root.findall('atom:entry', ns)
-        if not entries:
-            # Try without namespace if that fails (sometimes ElementTree behavior is tricky)
-            entries = root.findall('entry')
-            
-        ops = []
-        import hashlib
-        
-        for entry in entries:
-            try:
-                title = entry.find('atom:title', ns).text
-                if not title: title = entry.find('title').text
-                
-                link_elem = entry.find('atom:link', ns)
-                if link_elem is not None:
-                     link = link_elem.get('href')
-                else:
-                     link = entry.find('link').get('href')
-                     
-                updated = entry.find('atom:updated', ns)
-                ts_str = updated.text if updated is not None else datetime.now().isoformat()
-                # Parse ISO timestamp
-                try:
-                    ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                except:
-                    ts = datetime.now()
-                    
-                author_elem = entry.find('atom:author', ns)
-                author = "Unknown"
-                if author_elem is not None:
-                    name = author_elem.find('atom:name', ns)
-                    if name is not None: author = name.text
-                
-                # Generate unique ID
-                post_id = hashlib.md5(link.encode()).hexdigest()
-                
-                doc = {
-                    "reddit_id": f"rss_{post_id}",
-                    "title": title,
-                    "content": title, # RSS often has HTML content in summary, title is safer for NLP
-                    "url": link,
-                    "author": author,
-                    "timestamp": ts,
-                    "subreddit": "search_result",
-                    "score": 0, # RSS doesn't provide live score
-                    "num_comments": 0,
-                    "source": "reddit"
-                }
-                
-                ops.append(UpdateOne({"reddit_id": doc["reddit_id"]}, {"$set": doc}, upsert=True))
-            except Exception as e:
-                continue
-
-        if ops: 
-            db['posts'].bulk_write(ops)
-            print(f"      ✅ Upserted {len(ops)} Reddit (RSS) posts.")
-            return len(ops)
-            
-    except Exception as e:
-        print(f"      ⚠️ Reddit RSS Error: {e}")
-    return 0
-
-def fetch_google_news():
-    display_source_header("Google News")
-    keywords = ["Rice price", "Wheat production", "Onion shortage", "Farmer protest", "Agriculture subsidy"]
-    news_items = []
-    
-    for query in keywords:
-        try:
-            url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en"
-            resp = requests.get(url, timeout=10)
-            if resp.status_code == 200:
-                root = ET.fromstring(resp.content)
-                for item in root.findall('.//item')[:3]: 
-                    title = item.find('title').text
-                    link = item.find('link').text
-                    # Generate stable ID for Deduplication (News doesn't have native ID)
-                    import hashlib
-                    news_id = hashlib.md5(link.encode()).hexdigest()
-                    
-                    news_items.append({
-                        "reddit_id": f"news_{news_id}", # Fix: Unique Index Requirement
-                        "title": title,
-                        "content": title,
-                        "url": link,
-                        "timestamp": datetime.now(),
-                        "source": "news",
-                        "author": "Google News"
-                    })
-        except Exception: 
-            pass
-
-    ops = []
-    for item in news_items:
-        ops.append(UpdateOne({"url": item["url"]}, {"$set": item}, upsert=True))
-    
-    if ops:
-        try:
-            db['posts'].bulk_write(ops)
-            print(f"      ✅ Upserted {len(ops)} News articles.")
-        except Exception as e:
-            print(f"      ⚠️ News Write Error: {e}")
-            return 0
-    return len(ops)
-
-def fetch_youtube_videos():
-    display_source_header("YouTube")
-    queries = ["farming techniques India", "rice market updates", "modern agriculture technology"]
-    videos = []
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    for q in queries:
-        try:
-            url = f"https://www.youtube.com/results?search_query={q.replace(' ', '+')}&sp=CAI%253D" 
-            resp = requests.get(url, headers=headers, timeout=10)
-            if resp.status_code == 200:
-                video_ids = re.findall(r'"videoId":"([a-zA-Z0-9_-]{11})"', resp.text)
-                unique_ids = list(set(video_ids))[:5]
-                for vid in unique_ids:
-                    videos.append({
-                        "reddit_id": f"yt_{vid}", 
-                        "title": f"YouTube Video: {vid}",
-                        "content": f"Video discussion on {q}",
-                        "url": f"https://youtu.be/{vid}",
-                        "source": "youtube",
-                        "timestamp": datetime.now(),
-                        "author": "YouTube"
-                    })
-        except Exception:
-            pass
-
-    ops = []
-    for v in videos:
-        ops.append(UpdateOne({"url": v["url"]}, {"$set": v}, upsert=True))
-        
-    if ops:
-        try:
-            db['posts'].bulk_write(ops)
-            print(f"      ✅ Upserted {len(ops)} YouTube videos.")
-        except Exception as e:
-            print(f"      ⚠️ YouTube Write Error: {e}")
-            return 0
-    return len(ops)
 
 # ==========================================
 # 3. PIPELINE ORCHESTRATION
@@ -514,11 +338,8 @@ def fetch_all():
                 print(f"      ❌ Failed {c}")
         logger.log_step("Fetch Country Stats", "SUCCESS", f"Updated {cnt_updated} countries")
 
-        # C. Social Data (Serial Execution)
-        total_posts = 0
-        total_posts += fetch_reddit()
-        total_posts += fetch_google_news()
-        total_posts += fetch_youtube_videos()
+        # C. Social Data (Delegated to separate pipeline)
+        total_posts = run_social_pipeline()
 
         logger.finish_run("SUCCESS", {"posts_new": total_posts, "countries_updated": cnt_updated})
     except Exception as e:

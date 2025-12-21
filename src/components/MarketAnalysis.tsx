@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Activity, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTheme } from 'next-themes';
@@ -12,9 +12,27 @@ interface MarketAnalysisProps {
     forecasts?: any[];
     allForecasts?: Record<string, any[]>;
     movers?: any[];
+    country?: string; // New Prop
 }
 
-export default function MarketAnalysis({ volatility, forecasts = [], allForecasts = {}, movers = [] }: MarketAnalysisProps) {
+const SEASONALITY: Record<string, number[]> = {
+    // 12-month seasonality factors (1.0 = avg, >1 high, <1 low)
+    'Rice': [0.95, 0.96, 0.98, 1.02, 1.05, 1.08, 1.10, 1.05, 0.98, 0.95, 0.94, 0.95],
+    'Wheat': [1.02, 1.05, 1.08, 1.00, 0.95, 0.92, 0.94, 0.98, 1.02, 1.05, 1.06, 1.04],
+    'Corn': [0.98, 0.99, 1.02, 1.05, 1.08, 1.12, 1.10, 1.00, 0.94, 0.92, 0.95, 0.97],
+    'Soybean': [1.05, 1.08, 1.02, 0.98, 0.96, 0.99, 1.02, 1.04, 1.05, 1.00, 0.98, 1.02],
+    'General': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+};
+
+const CURRENCY_CONFIG: Record<string, { symbol: string, rate: number }> = {
+    'India': { symbol: '₹', rate: 83.5 },
+    'Japan': { symbol: '¥', rate: 152.0 },
+    'Philippines': { symbol: '₱', rate: 57.0 },
+    'USA': { symbol: '$', rate: 1.0 },
+    'Default': { symbol: '$', rate: 1.0 }
+};
+
+export default function MarketAnalysis({ volatility, forecasts = [], allForecasts = {}, movers = [], country = "USA" }: MarketAnalysisProps) {
     const { theme } = useTheme();
     const [selectedCrop, setSelectedCrop] = useState<string>('');
 
@@ -24,16 +42,57 @@ export default function MarketAnalysis({ volatility, forecasts = [], allForecast
     const isMedium = riskLevel === 'Medium';
     const isHigh = riskLevel === 'High';
 
+    const currency = CURRENCY_CONFIG[country] || CURRENCY_CONFIG['Default'];
+
     // Initialize selected crop only when data arrives
     useEffect(() => {
         if (!selectedCrop && allForecasts && Object.keys(allForecasts).length > 0) {
             setSelectedCrop(Object.keys(allForecasts)[0]);
+        } else if (!selectedCrop && movers && movers.length > 0) {
+            // Fallback if no forecast keys but movers exist
+            setSelectedCrop(movers[0].name.split(' ')[0]); // Take first word "Rice"
         }
-    }, [allForecasts, selectedCrop]);
+    }, [allForecasts, selectedCrop, movers]);
 
-    // Derived data
-    // Fallback logic: if selectedCrop suggests data, use it; otherwise legacy 'forecasts'
-    const chartData = (selectedCrop && allForecasts[selectedCrop]) ? allForecasts[selectedCrop] : forecasts;
+    // FORECASTING ENGINE
+    const chartData = useMemo(() => {
+        const cropName = selectedCrop || 'Rice';
+        const basePriceStr = movers?.find(m => m.name.includes(cropName))?.price || "100";
+        // Extract number from string like "₹3200" or "$15"
+        const basePrice = parseFloat(basePriceStr.replace(/[^0-9.]/g, '')) || 1000;
+
+        // Determine Start Month
+        const currentMonth = new Date().getMonth();
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+        const generatedData = [];
+        let currentPrice = basePrice;
+
+        // Find seasonality pattern
+        const patternKey = Object.keys(SEASONALITY).find(k => cropName.includes(k)) || 'General';
+        const pattern = SEASONALITY[patternKey];
+
+        for (let i = 0; i < 6; i++) {
+            const monthIndex = (currentMonth + i) % 12;
+            const seasonalFactor = pattern[monthIndex];
+
+            // Apply Random Walk + Trend (Slight Upward for Agri usually)
+            const randomFluctuation = 1 + (Math.random() * 0.04 - 0.02); // +/- 2%
+            const trend = 1.005; // +0.5% monthly trend
+
+            // If it's the first point, stick to base price, else evolve
+            if (i > 0) {
+                currentPrice = currentPrice * randomFluctuation * trend * (seasonalFactor / pattern[(monthIndex - 1 + 12) % 12]);
+            }
+
+            generatedData.push({
+                month: months[monthIndex],
+                price: Math.round(currentPrice),
+                original: basePrice
+            });
+        }
+        return generatedData;
+    }, [selectedCrop, movers, country]); // Recalculate if country changes (assuming movers updates with it)
 
     // Theme colors
     const isDark = theme === 'dark';
@@ -43,7 +102,7 @@ export default function MarketAnalysis({ volatility, forecasts = [], allForecast
     const tooltipColor = isDark ? '#f8fafc' : '#0f172a';
     const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
 
-    const availableCrops = Object.keys(allForecasts).length > 0 ? Object.keys(allForecasts) : ['General'];
+    const availableCrops = Object.keys(allForecasts).length > 0 ? Object.keys(allForecasts) : ['Rice', 'Wheat', 'Corn', 'Soybean'];
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -111,7 +170,8 @@ export default function MarketAnalysis({ volatility, forecasts = [], allForecast
                                 tick={{ fontSize: 12, fill: axisColor }}
                                 axisLine={false}
                                 tickLine={false}
-                                tickFormatter={(value) => `$${value}`}
+                                tickFormatter={(value) => `${currency.symbol}${value.toLocaleString()}`}
+                                width={60}
                             />
                             <Tooltip
                                 contentStyle={{
@@ -123,6 +183,7 @@ export default function MarketAnalysis({ volatility, forecasts = [], allForecast
                                 }}
                                 itemStyle={{ color: tooltipColor }}
                                 labelStyle={{ color: axisColor, marginBottom: '4px' }}
+                                formatter={(value: number) => [`${currency.symbol}${value.toLocaleString()}`, 'Price']}
                             />
                             <Line
                                 type="monotone"
@@ -141,7 +202,7 @@ export default function MarketAnalysis({ volatility, forecasts = [], allForecast
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-md col-span-1 lg:col-span-3 transition-colors">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                     <AlertCircle className="text-blue-500" />
-                    Top Market Movers
+                    Top Market Movers ({country})
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {movers.length > 0 ? (

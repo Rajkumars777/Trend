@@ -19,19 +19,23 @@ export async function GET(request: Request) {
 
         // Sentiment Filter
         if (sentiment && sentiment !== 'All') {
-            query['analysis.sentiment_class'] = sentiment;
+            query['analysis.sentiment_class'] = { $regex: new RegExp(`^${sentiment}$`, 'i') };
         }
 
         // Platform Filter
         if (platform && platform !== 'All') {
-            query['source'] = platform.toLowerCase();
+            query['source'] = { $regex: new RegExp(`^${platform}$`, 'i') };
         }
 
         // Date Range Filter
         if (startDate || endDate) {
             query['timestamp'] = {};
             if (startDate) query['timestamp']['$gte'] = new Date(startDate);
-            if (endDate) query['timestamp']['$lte'] = new Date(endDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setUTCHours(23, 59, 59, 999);
+                query['timestamp']['$lte'] = end;
+            }
         }
 
         const skip = (page - 1) * limit;

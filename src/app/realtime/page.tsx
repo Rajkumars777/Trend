@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import PostFeed from '@/components/PostFeed';
-import { Loader2, Radio, Filter, Calendar, Twitter, MessageCircle, Youtube, Newspaper } from 'lucide-react';
+import { Loader2, Radio, Filter, Calendar, Twitter, MessageCircle, Youtube, Newspaper, Facebook, Instagram, Linkedin } from 'lucide-react';
 
 export default function RealtimePage() {
     const [posts, setPosts] = useState<any[]>([]);
@@ -136,10 +136,13 @@ export default function RealtimePage() {
             </div>
 
             {/* Platform Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
                 <PlatformCard name="Reddit" icon={MessageCircle} color="#FB923C" />
                 <PlatformCard name="YouTube" icon={Youtube} color="#EF4444" />
                 <PlatformCard name="News" icon={Newspaper} color="#A3A3A3" />
+                <PlatformCard name="Facebook" icon={Facebook} color="#1877F2" />
+                <PlatformCard name="Instagram" icon={Instagram} color="#E4405F" />
+                <PlatformCard name="LinkedIn" icon={Linkedin} color="#0A66C2" />
             </div>
 
             {/* Filter Toolbar */}
@@ -158,6 +161,9 @@ export default function RealtimePage() {
                     <option value="Reddit">Reddit</option>
                     <option value="YouTube">YouTube</option>
                     <option value="News">News</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="LinkedIn">LinkedIn</option>
                 </select>
 
                 <select

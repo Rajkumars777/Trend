@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, HeartPulse, Globe, Radio, TrendingUp, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Activity, HeartPulse, Globe, Radio, TrendingUp, Settings, Menu, X, ChevronLeft, ChevronRight, MessageSquareCode } from 'lucide-react';
+
 import clsx from 'clsx';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -26,6 +27,12 @@ const NAV_SECTIONS = [
         title: 'Market Intelligence',
         items: [
             { name: 'Market & Pricing', href: '/market', icon: TrendingUp },
+        ]
+    },
+    {
+        title: 'AI Tools',
+        items: [
+            { name: 'Agri Chatbot', href: '/chatbot', icon: MessageSquareCode },
         ]
     }
 ];
@@ -94,8 +101,8 @@ export default function Sidebar() {
 
                 <div className="p-4 border-t border-border flex items-center justify-between">
                     <button className="flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-foreground transition-colors">
-                        <Settings size={20} />
-                        <span className="font-medium">Settings</span>
+
+                        <span className="font-medium">Theme</span>
                     </button>
                     <ThemeToggle />
                 </div>

@@ -1,0 +1,12 @@
+TEXT                                                         | EXPECTED   | PREDICTED  | SCORE  | CATEGORY       
+------------------------------------------------------------------------------------------------------------------------
+Rice prices have crashed due to heavy rainfall destroying    | Negative   | Negative   | -0.6526 | Market Prices   [OK]
+Bumper harvest expected this year for wheat farmers in Pun   | Positive   | Positive   | 0.6611 | Crop Updates    [OK]
+Government announces new subsidy for solar pumps.            | Positive   | Positive   | 0.75   | Government Policy [OK]
+Locust attack reported in Rajasthan, potentially damaging    | Negative   | Negative   | -0.6902 | Pest & Disease  [OK]
+The stock market is volatile today due to tech sector sell   | Irrelevant | Irrelevant | 0.0    | None            [OK]
+Farmers are protesting against the new bill.                 | Negative   | Negative   | -0.7102 | Government Policy [OK]
+Neutral report on sowing area statistics for 2024.           | Neutral    | Neutral    | 0.0    | Crop Updates    [OK]
+I love playing video games on my farm.                       | Irrelevant | Irrelevant | 0.0    | None            [OK]
+------------------------------------------------------------------------------------------------------------------------
+Accuracy on Test Set: 100.00%

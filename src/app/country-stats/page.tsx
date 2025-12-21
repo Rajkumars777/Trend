@@ -225,6 +225,7 @@ export default function CountryStatsPage() {
                                 volatility={deepData.market.analysis.volatility}
                                 allForecasts={deepData.market.analysis.allForecasts}
                                 movers={deepData.market.analysis.movers}
+                                country={selectedCountry}
                             />
                         </div>
                     )}

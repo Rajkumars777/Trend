@@ -67,6 +67,7 @@ export async function GET() {
 
             // 3. Top Crop
             Post.aggregate([
+                { $match: { timestamp: { $gte: sevenDaysAgo } } },
                 { $unwind: "$analysis.detected_keywords" },
                 { $match: { "analysis.detected_keywords": { $in: CROP_KEYWORDS } } },
                 { $group: { _id: "$analysis.detected_keywords", count: { $sum: 1 } } },
@@ -113,6 +114,7 @@ export async function GET() {
 
             // 7. Word Cloud
             Post.aggregate([
+                { $match: { timestamp: { $gte: sevenDaysAgo } } },
                 { $unwind: "$analysis.detected_keywords" },
                 { $group: { _id: "$analysis.detected_keywords", count: { $sum: 1 } } },
                 { $sort: { count: -1 } },

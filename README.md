@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agri-Trend: Real-Time Cognitive Agricultural Intelligence
 
-## Getting Started
+Agri-Trend is an advanced "System of Insight" for agricultural markets. It evolves beyond heuristic baselines to a **Real-Time Cognitive Architecture** capable of forecasting price trends, detecting viral risks, and filtering non-agricultural noise from social media streams.
 
-First, run the development server:
+## 🧠 Cognitive Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+This system uses a **Kappa Architecture** pattern to process streaming data through a series of intelligent engines.
+
+```mermaid
+graph TD
+    subgraph Ingestion Layer
+        A[Reddit RSS] -->|Raw Text| K(Cognitive Pipeline Stream)
+        B[Google News] -->|Raw Text| K
+        C[YouTube] -->|Raw Text| K
+    end
+
+    subgraph The Gatekeeper
+        K --> D{Relevance Gate}
+        D -->|Irrelevant/Spam| E[Discard]
+        D -->|Relevant| F[NLP Engine]
+    end
+
+    subgraph Cognitive Processing
+        F -->|Aspects + Entities| G[Graph Engine GNN]
+        G -->|Viral Risk Score| H[Drift Monitor]
+        H -->|Drift Alert| I[Window Buffer]
+    end
+
+    subgraph Forecasting & Storage
+        I -->|Micro-Batch| J{Forecasting Engine}
+        J -->|TFT/NeuralProphet| L[Price Forecast]
+        I -->|Enriched Doc| M[(MongoDB)]
+    end
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Key Modules
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. The Gatekeeper (`scripts/advanced_analytics/relevance_gate.py`)
+**Solves the "Karma Farm" Problem.**
+- Uses a hybrid filter (Blacklist + Contextual Intersection) to block gaming terms ("server farm", "farming xp") and ensure only legitimate agricultural data enters the pipeline.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. NLP Engine (`scripts/advanced_analytics/nlp_engine.py`)
+**Domain-Adaptive Understanding.**
+- **AgriBERT Integration**: Understands agricultural nuances (e.g., "blight" = disease).
+- **Aspect-Based Sentiment Analysis (ABSA)**: Decouples sentiment into **Yield**, **Price**, and **Policy**.
 
-## Learn More
+### 3. Graph Neural Network (`scripts/advanced_analytics/graph_engine.py`)
+**Risk & Influence Modeling.**
+- Models the relationship between **Influencers**, **Commodities**, and **Mandis**.
+- Predicts **Viral Risk** (e.g., panic selling driven by influential users) before it impacts price.
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Forecasting Engine (`scripts/advanced_analytics/forecasting_engine.py`)
+**State-of-the-Art Prediction.**
+- Uses **Temporal Fusion Transformers (TFT)** and **NeuralProphet**.
+- Generates multi-horizon price forecasts (T+3 Days) by combining social sentiment, weather data, and known future events (holidays).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠️ Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. Prerequisites
+- Python 3.9+
+- MongoDB (Local or Atlas)
+- Node.js 18+
 
-## Deploy on Vercel
+### 2. Run the Cognitive Pipeline
+Start the Python backend to stream data, analyze it, and store insights.
+```bash
+python scripts/cognitive_pipeline.py
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. Run the Dashboard
+Start the Next.js frontend to visualize the data.
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the Real-Time Dashboard.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📂 Project Structure
+- `scripts/cognitive_pipeline.py`: The Main Orchestrator (Kappa Stream).
+- `scripts/social_media_pipeline.py`: Data Scrapers (Reddit, News, YouTube).
+- `scripts/advanced_analytics/`: The Brain (NLP, GNN, Drift, Gate).
+- `src/`: Next.js Frontend.
