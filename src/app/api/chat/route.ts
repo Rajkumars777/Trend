@@ -57,12 +57,12 @@ async function fetchGoogleSearch(query: string) {
 
 export async function POST(request: Request) {
     try {
-        const { query } = await request.json();
+        const { query, documentContext } = await request.json(); // Accept documentContext
         if (!query) return NextResponse.json({ answer: "Hello! I am your Agri-Assistant powered by Gemini 1.5 Flash. Ask away!", sources: [] });
 
-        // 1. SMART INTENT DETECTION
-        const isGreeting = /^(hi|hello|hey|greetings|good morning|yo|how are you|test|ping)$/i.test(query.trim()) ||
-            (query.split(' ').length < 4 && /^(hi|hello|hey)/i.test(query));
+        // 1. INTENT DETECTION (Rule-based)
+        const isMarketQuery = /price|cost|rate|trend|market|forecast|outlook|buy|sell|future/i.test(query);
+        const isGreeting = /^(hi|hello|hey|greetings)/i.test(query);
 
         if (isGreeting) {
             return NextResponse.json({
@@ -71,23 +71,129 @@ export async function POST(request: Request) {
             });
         }
 
-        // 2. WEB SEARCH (Context Awareness)
-        // Don't search if it's purely conversational to save API calls and noise
-        const needsSearch = !isGreeting && query.length > 5;
+        // 2. WEB SEARCH (Google) - Skip if Document is provided or specific intent
+        // Don't search if it's purely conversational or if we have a document (focus on doc)
+        const needsSearch = !isGreeting && !documentContext && query.length > 5;
         const webNews = needsSearch ? await fetchGoogleSearch(query) : [];
 
         // 3. GENERATION
         let finalAnswer = "";
 
-        if (!process.env.GEMINI_API_KEY) {
-            finalAnswer = `## ⚠️ Setup Required
-I need a **Google Gemini API Key** to function.
+        // Check for OpenRouter (DeepSeek) first
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const geminiKey = process.env.GEMINI_API_KEY;
 
-1. Get a free key from [Google AI Studio](https://aistudio.google.com/).
-2. Add it to \`.env.local\`:
-   \`GEMINI_API_KEY=your_key_here\`
-3. Restart the server.`;
-        } else {
+        // RAG: Fetch Social Media Context
+        let socialContext = "";
+        try {
+            const client = await clientPromise;
+            const db = client.db('agri_trend_dashboard');
+
+            // Extract keywords (simple whitespace split, filter short words)
+            const keywords = query.split(/\s+/).filter((w: string) => w.length > 3).map((w: string) => new RegExp(w, 'i'));
+
+            if (keywords.length > 0) {
+                const posts = await db.collection('posts').find({
+                    $or: [
+                        { content: { $in: keywords } },
+                        { "analysis.detected_keywords": { $in: keywords } }
+                    ]
+                }).limit(8).sort({ timestamp: -1 }).toArray();
+
+                if (posts.length > 0) {
+                    const postSummaries = posts.map((p: any) =>
+                        `- "${p.content.substring(0, 100)}..." (Sentiment: ${p.analysis?.sentiment_score || 0}, Source: ${p.source})`
+                    ).join("\n");
+                    socialContext = `\n\nRECENT SOCIAL MEDIA ACTIVITY (Real User Posts):\n${postSummaries}`;
+                }
+            }
+        } catch (dbError) {
+            console.error("RAG Fetch Error:", dbError);
+            // Continue without social context if DB fails
+        }
+
+        if (openRouterKey) {
+            try {
+                const OpenAI = require("openai"); // Dynamic import to avoid build issues if not used, or use import at top
+                const openai = new OpenAI({
+                    baseURL: "https://openrouter.ai/api/v1",
+                    apiKey: openRouterKey,
+                });
+
+                // Only use Web Data for context
+                const googleData = webNews.map((s: any) => `- ${s.title}: ${s.snippet}`).join("\n");
+
+                const docSection = documentContext ? `\n\n📄 **UPLOADED DOCUMENT CONTENT:**\n"${documentContext.substring(0, 15000)}..."\n(Use this information to answer the user's question about the document)` : "";
+
+                const systemPrompt = `You are an elite Agricultural Intelligence Consultant.
+
+CONTEXT:
+**Current Date:** ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+${docSection}
+${googleData || "No external data needed."}
+${socialContext}
+
+INSTRUCTIONS:
+1. **SCOPE ENFORCEMENT (CRITICAL):**
+   - If the user uploaded a document, **FIRST CHECK IF IT IS AGRI-RELATED**.
+     - **Allowed Documents**: Crop Reports, Market Price Lists, Weather Forecasts, Machinery Manuals, Gov Policy on Farming.
+     - **Forbidden Documents**: Crypto Reports, Novels, Tech Tutorials, General News.
+     - **Action**: If the document is NOT agriculture-related, **REFUSE** to analyze it. Say: "I can only analyze agriculture-related documents. This document appears to be about [topic]."
+   
+   - If the document IS valid, **PRIORITIZE** answering from it.
+   - You are an **Agricultural Intelligence Consultant**. You ONLY answer questions related to:
+     - Agriculture (Crops, Farming, Soil, Pests)
+     - Market Prices & Trends (Wholesale, Retail)
+     - Agri-Machinery (Tractors, Tools, Equipment)
+     - Weather impacts on farming.
+     - **AND Content within the uploaded document (IF and ONLY IF it is agri-related).**
+   - If the user asks about ANYTHING else, **POLITELY REFUSE**.
+     - Example Refusal: "I specialize only in agricultural market trends, machinery, and crop prices. I cannot assist with [topic]."
+   - **EXCEPTION:** You can answer basic greetings ("Hi", "Hello") friendly.
+
+2. **CLASSIFY INTENT:**
+   - If the user is asking about the **Document**, answer from it.
+   - If the user is just chatting, be friendly but steer them back to agriculture.
+   - If the user asks about **Prices, Crops, Weather, or Trends**, you MUST follow the **STRICT REPORTING FORMAT**.
+
+STRICT REPORTING FORMAT (Only for Market/Agri Queries):
+1. **Data Visualization (MANDATORY):** Use a **Markdown Table** (Columns: Market/Variety | Wholesale Price | Retail Price).
+2. **High Contrast:** **BOLD** every price, percentage, and key location.
+3. **Structure:**
+   - 🌟 **Executive Summary:** Direct answer.
+   ---
+   - 💰 **Market Pulse:** [TABLE]
+   ---
+   - 📈 **Trend Analysis:** Bullet points with arrows (⬆️ ⬇️).
+   ---
+   - 🗣️ **Social Sentiment:** Analyze the "RECENT SOCIAL MEDIA ACTIVITY" provided above. Summarize what people are saying.
+   ---
+   - 💡 **Pro Tip:** Actionable advice.
+
+4. **Tone:** Executive, Data-Driven, Premium.`;
+
+                const completion = await openai.chat.completions.create({
+                    model: "deepseek/deepseek-chat", // DeepSeek V3/V2.5 via OpenRouter
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: query }
+                    ],
+                });
+
+                finalAnswer = completion.choices[0].message.content || "No response generated.";
+
+            } catch (error: any) {
+                console.error("OpenRouter Error:", error);
+                if (error.status === 402) {
+                    finalAnswer = "⚠️ **DeepSeek Credit Issue:** Insufficient balance on OpenRouter. Falling back requires manual intervention or credit top-up.";
+                } else {
+                    finalAnswer = `⚠️ Error using DeepSeek: ${error.message}`;
+                    // Optionally fall back to Gemini here if you want
+                }
+            }
+        }
+        // Fallback to Gemini if OpenRouter is missing (or if you add fallback logic above)
+        else if (geminiKey) {
             try {
                 // Only use Web Data for context (kept internal, not shown as cards)
                 const googleData = webNews.map((s: any) => `- ${s.title}: ${s.snippet}`).join("\n");
@@ -98,13 +204,23 @@ I need a **Google Gemini API Key** to function.
 CONTEXT:
 **Current Date:** ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 ${googleData || "No external data needed."}
+${socialContext}
 
 USER QUERY: ${query}
 
 INSTRUCTIONS:
-1. **CLASSIFY INTENT FIRST:**
-   - If the user is just chatting ("How are you?", "Who are you?", "Thanks"), ignore the strict reporting format. Just be friendly, professional, and concise.
-   - If the user asks about **Prices, Crops, Weather, or Trends**, you MUST follow the **STRICT REPORTING FORMAT** below.
+1. **SCOPE ENFORCEMENT (CRITICAL):**
+   - You are an **Agricultural Intelligence Consultant**. You ONLY answer questions related to:
+     - Agriculture (Crops, Farming, Soil, Pests)
+     - Market Prices & Trends
+     - Agri-Machinery (Tractors, Tools)
+     - Weather impacts on farming.
+   - If the user asks about ANYTHING else, **POLITELY REFUSE**.
+     - Example: "I specialize only in agricultural topics. I cannot assist with [topic]."
+
+2. **CLASSIFY INTENT:**
+   - If the user is just chatting, be friendly but steer them back to agriculture.
+   - If the user asks about **Prices, Crops, Weather, or Trends**, you MUST follow the **STRICT REPORTING FORMAT**.
 
 STRICT REPORTING FORMAT (Only for Market/Agri Queries):
 1. **Data Visualization (MANDATORY):** Use a **Markdown Table** for comparison. (Columns: Market/Variety | Wholesale Price | Retail Price).
@@ -115,6 +231,8 @@ STRICT REPORTING FORMAT (Only for Market/Agri Queries):
    - 💰 **Market Pulse:** [TABLE]
    ---
    - 📈 **Trend Analysis:** Bullet points with arrows (⬆️ ⬇️).
+   ---
+   - 🗣️ **Social Sentiment:** Analyze the "RECENT SOCIAL MEDIA ACTIVITY" provided above.
    ---
    - 💡 **Pro Tip:** Actionable advice.
 
@@ -146,6 +264,14 @@ STRICT REPORTING FORMAT (Only for Market/Agri Queries):
                     finalAnswer = "⚠️ I encountered an error communicating with Gemini. Please check your API usage.";
                 }
             }
+        } else {
+            finalAnswer = `## ⚠️ Setup Required
+I need an API Key (DeepSeek or Gemini) to function.
+
+1. Get a key from [OpenRouter](https://openrouter.ai/) or [Google AI Studio](https://aistudio.google.com/).
+2. Add it to \`.env.local\`:
+   \`OPENROUTER_API_KEY=your_key\` or \`GEMINI_API_KEY=your_key\`
+3. Restart the server.`;
         }
 
         return NextResponse.json({

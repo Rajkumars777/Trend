@@ -10,7 +10,7 @@ export async function GET() {
         const Post = db.model('PostV3', defaultModel.schema, 'posts');
 
         // Platforms to analyze
-        const platforms = ['twitter', 'reddit', 'youtube', 'news'];
+        const platforms = ['twitter', 'reddit', 'youtube', 'news', 'facebook', 'instagram', 'linkedin', 'medium', 'mastodon', 'lemmy'];
         const results: any = {};
 
         // Helper: Get recent date range for trend

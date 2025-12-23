@@ -100,11 +100,17 @@ export async function GET() {
             // 6. Influencers
             Post.aggregate([
                 {
+                    $match: {
+                        author: { $nin: ["[deleted]", "Public User", "unknown", "AutoModerator", "YouTube"] }
+                    }
+                },
+                {
                     $group: {
                         _id: "$author",
                         count: { $sum: 1 },
                         avg_sentiment: { $avg: "$analysis.sentiment_score" },
                         platform: { $first: "$source" },
+                        url: { $first: "$url" },
                         last_post: { $max: "$timestamp" }
                     }
                 },
@@ -258,15 +264,25 @@ export async function GET() {
             recentPosts,
             predictions,
             influencers: influencers.map((i: any) => {
-                let profileUrl = "#";
-                if (i.platform === 'twitter') profileUrl = `https://twitter.com/${i._id}`;
-                else if (i.platform === 'reddit') profileUrl = `https://www.reddit.com/user/${i._id}`;
-                else if (i.platform === 'youtube') profileUrl = `https://www.youtube.com/user/${i._id}`;
+                const cleanHandle = i._id ? i._id.replace(/\s+/g, '') : '';
+                const platform = i.platform ? i.platform.toLowerCase() : '';
+
+                let profileUrl = i.url || "#";
+
+                // Generate specific profile links for social platforms
+                if (platform === 'twitter') profileUrl = `https://twitter.com/${cleanHandle}`;
+                else if (platform === 'reddit') profileUrl = `https://www.reddit.com/user/${cleanHandle}`;
+                else if (platform === 'youtube') profileUrl = `https://www.youtube.com/user/${cleanHandle}`;
+
+                // Fallback to Google Search only if we still don't have a valid URL (and it's not a known social platform)
+                if ((!profileUrl || profileUrl === "#" || profileUrl.trim() === "") && platform !== 'twitter' && platform !== 'reddit' && platform !== 'youtube') {
+                    profileUrl = `https://www.google.com/search?q=${encodeURIComponent(i._id || '')}`;
+                }
 
                 return {
                     name: i._id || 'Unknown',
-                    handle: i._id ? `@${i._id.replace(/\s+/g, '')}` : '@unknown',
-                    platform: i.platform,
+                    handle: cleanHandle ? `@${cleanHandle}` : '@unknown',
+                    platform: platform,
                     reach: `${(i.count * 1.5).toFixed(1)}K`,
                     sentiment: i.avg_sentiment > 0.05 ? 'Positive' : i.avg_sentiment < -0.05 ? 'Negative' : 'Neutral',
                     engagement: Math.min(100, Math.round(Math.random() * 40 + 60)),

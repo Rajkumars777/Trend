@@ -58,15 +58,25 @@ export async function GET(request: Request) {
             if (c._id) counts[c._id] = c.count;
         });
 
-        const transformedPosts = posts.map((post: any) => ({
-            ...post,
-            metrics: post.metrics || {
-                upvotes: post.metadata?.score || 0,
-                likes: post.metadata?.likes || 0,
-                comments: post.metadata?.comments || 0,
-                views: post.metadata?.views || 0
+        const transformedPosts = posts.map((post: any) => {
+            let content = post.content;
+
+            // Prefer metadata title for YouTube to avoid generic descriptions
+            if (post.source === 'youtube' && post.metadata?.title) {
+                content = post.metadata.title;
             }
-        }));
+
+            return {
+                ...post,
+                content,
+                metrics: post.metrics || {
+                    upvotes: post.metadata?.score || 0,
+                    likes: post.metadata?.likes || 0,
+                    comments: post.metadata?.comments || 0,
+                    views: post.metadata?.views || 0
+                }
+            };
+        });
 
         return NextResponse.json({
             posts: transformedPosts,

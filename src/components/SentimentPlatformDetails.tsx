@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import {
-    AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid
+    AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid, BarChart, Bar, Cell
 } from 'recharts';
-import { Twitter, MessageCircle, Youtube, Newspaper, Heart, Users, Hash } from 'lucide-react';
+import { Twitter, MessageCircle, Youtube, Newspaper, Heart, Users, Hash, Facebook, Instagram, Linkedin, BarChart2, BookOpen, Globe, Link2 } from 'lucide-react';
 import clsx from 'clsx';
 
 interface PlatformData {
@@ -25,14 +26,26 @@ const PLATFORM_ICONS: Record<string, any> = {
     twitter: Twitter,
     reddit: MessageCircle,
     youtube: Youtube,
-    news: Newspaper
+    news: Newspaper,
+    facebook: Facebook,
+    instagram: Instagram,
+    linkedin: Linkedin,
+    medium: BookOpen,
+    mastodon: Globe,
+    lemmy: Link2
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
     twitter: '#38BDF8',
     reddit: '#FB923C',
     youtube: '#EF4444',
-    news: '#A3A3A3'
+    news: '#A3A3A3',
+    facebook: '#1877F2',
+    instagram: '#E4405F',
+    linkedin: '#0A66C2',
+    medium: '#12100E',
+    mastodon: '#6364FF',
+    lemmy: '#000000'
 };
 
 const formatYAxis = (value: number) => {
@@ -53,6 +66,8 @@ const formatXAxis = (dateStr: string) => {
 };
 
 export default function SentimentPlatformDetails({ data }: SentimentDetailsProps) {
+    const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+
     if (!data || !data.platforms) return null;
 
     const platforms = Object.keys(data.platforms).filter(p => p !== 'twitter');
@@ -149,63 +164,112 @@ export default function SentimentPlatformDetails({ data }: SentimentDetailsProps
             </div>
 
             {/* Engagement Trend Area Chart */}
-            <div className="bg-card from-card/50 to-card/10 border border-border/50 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl transition-all duration-500">
+            {/* Total Posts & Interactive Sentiment Breakdown */}
+            <div className="bg-card from-card/50 to-card/10 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl transition-all duration-500">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                        <TrendingUpIcon />
+                        <BarChart2 />
                     </div>
-                    <h3 className="text-xl font-bold text-foreground">Engagement Over Time</h3>
+                    <div>
+                        <h3 className="text-xl font-bold text-foreground">Total Posts by Platform</h3>
+                        <p className="text-sm text-muted-foreground">Click a bar to see sentiment breakdown</p>
+                    </div>
                 </div>
 
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data.engagementTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                                {platforms.map(p => (
-                                    <linearGradient key={p} id={`color-${p}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={PLATFORM_COLORS[p] || '#888'} stopOpacity={0.4} />
-                                        <stop offset="95%" stopColor={PLATFORM_COLORS[p] || '#888'} stopOpacity={0.1} />
-                                    </linearGradient>
-                                ))}
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
-                            <XAxis
-                                dataKey="date"
-                                stroke="var(--muted-foreground)"
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                                dy={10}
-                                tickFormatter={formatXAxis}
-                            />
-                            <YAxis
-                                stroke="var(--muted-foreground)"
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={formatYAxis}
-                                width={50}
-                            />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: 'rgb(255 255 255 / 0.9)', backdropFilter: 'blur(10px)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.2)', color: '#000', padding: '12px' }}
-                                itemStyle={{ fontWeight: 600 }}
-                                labelFormatter={(label) => new Date(label).toLocaleDateString()}
-                            />
-                            <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                            {platforms.map(p => (
-                                <Area
-                                    key={p}
-                                    type="monotone"
-                                    dataKey={p}
-                                    stroke={PLATFORM_COLORS[p] || '#fff'}
-                                    strokeWidth={4}
-                                    fillOpacity={1}
-                                    fill={`url(#color-${p})`}
-                                    activeDot={{ r: 6, strokeWidth: 0 }}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    {/* Left: Interactive Bar Chart */}
+                    <div className="h-[350px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={platforms.map(p => ({
+                                    name: p,
+                                    count: data.platforms[p]?.totalVolume || 0,
+                                    fill: PLATFORM_COLORS[p] || '#888'
+                                }))}
+                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                onClick={(state: any) => {
+                                    if (state && state.activeLabel) {
+                                        setSelectedPlatform(state.activeLabel);
+                                    }
+                                }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} opacity={0.3} />
+                                <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} dy={10} tickFormatter={(val) => val.charAt(0).toUpperCase() + val.slice(1)} />
+                                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatYAxis} width={50} />
+                                <Tooltip
+                                    cursor={{ fill: 'var(--primary)', opacity: 0.1, radius: 8 }}
+                                    contentStyle={{ backgroundColor: 'rgb(255 255 255 / 0.9)', backdropFilter: 'blur(10px)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.2)', color: '#000', padding: '12px' }}
+                                    formatter={(value: number) => [value.toLocaleString(), 'Total Posts']}
                                 />
-                            ))}
-                        </AreaChart>
-                    </ResponsiveContainer>
+                                <Bar dataKey="count" radius={[8, 8, 8, 8]} barSize={50} animationDuration={1000}>
+                                    {platforms.map((p, i) => (
+                                        <Cell key={i} fill={PLATFORM_COLORS[p] || '#888'} cursor="pointer" opacity={selectedPlatform === p ? 1 : selectedPlatform ? 0.3 : 1} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Right: Selected Platform Details */}
+                    <div className="bg-neutral-50 dark:bg-slate-900/50 rounded-[2rem] p-8 border border-neutral-100 dark:border-white/5 flex flex-col justify-center h-full min-h-[350px]">
+                        {selectedPlatform ? (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                                <div className="flex items-center gap-4 border-b border-border/50 pb-4">
+                                    <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 shadow-sm text-foreground">
+                                        {(() => {
+                                            const Icon = PLATFORM_ICONS[selectedPlatform] || MessageCircle;
+                                            return <Icon size={32} style={{ color: PLATFORM_COLORS[selectedPlatform] }} />;
+                                        })()}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-2xl font-bold text-foreground capitalize">{selectedPlatform}</h4>
+                                        <p className="text-muted-foreground">Sentiment Breakdown</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {/* Sentiment Bars */}
+                                    {[
+                                        { label: 'Positive', key: 'positive', color: 'bg-emerald-500', text: 'text-emerald-600' },
+                                        { label: 'Neutral', key: 'neutral', color: 'bg-slate-400', text: 'text-slate-500' },
+                                        { label: 'Negative', key: 'negative', color: 'bg-red-500', text: 'text-red-500' },
+                                    ].map((item) => {
+                                        const stats = data.platforms[selectedPlatform];
+                                        const pct = stats.sentimentBreakdown[item.key as keyof typeof stats.sentimentBreakdown];
+                                        const count = Math.round((pct / 100) * stats.totalVolume);
+
+                                        return (
+                                            <div key={item.key}>
+                                                <div className="flex justify-between text-sm font-medium mb-1.5">
+                                                    <span className={item.text}>{item.label}</span>
+                                                    <span className="text-foreground font-bold">{count.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">({pct}%)</span></span>
+                                                </div>
+                                                <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                    <div style={{ width: `${pct}%` }} className={clsx("h-full transition-all duration-1000 ease-out", item.color)} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
+                                    <div className="text-center">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Volume</span>
+                                        <p className="text-2xl font-black text-foreground">{data.platforms[selectedPlatform].totalVolume.toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wider">Engagement</span>
+                                        <p className="text-2xl font-black text-foreground">{data.platforms[selectedPlatform].engagementFactor}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center space-y-4 opacity-50">
+                                <BarChart2 size={48} className="mx-auto text-muted-foreground" />
+                                <p className="text-lg font-medium text-muted-foreground">Select a platform from the chart to view detailed sentiment breakdown.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
