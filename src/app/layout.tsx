@@ -24,8 +24,8 @@ export default function RootLayout({
       <body className={`font-sans bg-background text-foreground`} style={{ fontFamily: "'Inter', sans-serif" }}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <div className="flex min-h-screen">

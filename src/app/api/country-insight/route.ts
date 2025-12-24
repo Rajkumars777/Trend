@@ -39,6 +39,8 @@ const CONCERN_KEYWORDS = {
 const POSITIVE_KEYWORDS = ["boost", "growth", "rise", "record", "surplus", "profit", "success", "innovate", "solution", "good", "stable", "boom", "high yield"];
 const NEGATIVE_KEYWORDS = ["drop", "fall", "decline", "loss", "crisis", "shortage", "fail", "damage", "destroy", "risk", "threat", "bad", "low yield", "drought", "flood"];
 
+const API_KEY = '1a5565ba8bc041a7b8b61321250912'; // Shared key from country-stats
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const country = searchParams.get('country');
@@ -49,7 +51,6 @@ export async function GET(request: Request) {
 
     try {
         // 1. Fetch Live News (Broad Agriculture search)
-        // We fetch more items to get a better statistical sample
         const newsQuery = encodeURIComponent(`Agriculture ${country}`);
         const feed = await parser.parseURL(`https://news.google.com/rss/search?q=${newsQuery}&hl=en-US&gl=US&ceid=US:en`);
 
@@ -57,13 +58,26 @@ export async function GET(request: Request) {
         const aiQuery = encodeURIComponent(`Agriculture Technology AI ${country}`);
         const aiFeed = await parser.parseURL(`https://news.google.com/rss/search?q=${aiQuery}&hl=en-US&gl=US&ceid=US:en`);
 
-        // 3. Fetch Live Weather
+        // 3. Fetch Live Weather via WeatherAPI (Rich Data)
         let weather = null;
-        const coords = COUNTRY_COORDS[country] || COUNTRY_COORDS["India"]; // Fallback
-        if (coords) {
-            // Fetch current weather + daily forecast for max/min temps to gauge extremes
-            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
-            weather = await weatherRes.json();
+        let capital = COUNTRY_COORDS[country]?.capitalName || country; // Fallback to country name if capital unknown
+
+        try {
+            const weatherRes = await fetch(`http://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(capital)}&days=1&aqi=no&alerts=no`);
+            if (weatherRes.ok) {
+                const wData = await weatherRes.json();
+                weather = {
+                    temp: wData.current.temp_c,
+                    condition: wData.current.condition.text,
+                    feels_like: wData.current.feelslike_c,
+                    humidity: wData.current.humidity,
+                    wind_kph: wData.current.wind_kph,
+                    precip: wData.forecast?.forecastday?.[0]?.day?.totalprecip_mm || 0,
+                    capital: wData.location.name
+                };
+            }
+        } catch (e) {
+            console.error("WeatherAPI fetch failed:", e);
         }
 
         // 4. Analytics Processing
@@ -99,8 +113,6 @@ export async function GET(request: Request) {
         });
 
         // Normalize Data
-        // Convert counts to a "Density" (0-100 scale) relative to sample size
-        // We multiply by a factor to make it visible even with few hits
         const density = {
             weather: Math.min(100, Math.round((concernCounts.weather / totalAnalyzed) * 200)) || 0,
             price: Math.min(100, Math.round((concernCounts.price / totalAnalyzed) * 200)) || 0,
@@ -112,7 +124,7 @@ export async function GET(request: Request) {
         let sentimentLabel = "Neutral";
         if (avgSentiment > 0.1) sentimentLabel = "Positive";
         if (avgSentiment < -0.1) sentimentLabel = "Negative";
-        if (avgSentiment < -0.4) sentimentLabel = "Critical"; // Very bad news
+        if (avgSentiment < -0.4) sentimentLabel = "Critical";
 
         // Trend Text
         const trends = [];
@@ -120,8 +132,6 @@ export async function GET(request: Request) {
         if (density.price > 40) trends.push("Market Volatility");
         if (density.pest > 20) trends.push("Pest Risks");
         if (trends.length === 0) trends.push("Stable Operations");
-
-        // ... existing logic ...
 
         // 5. Crop-Specific Risk Analysis
         const CROP_VARIANTS: Record<string, string[]> = {
@@ -157,7 +167,7 @@ export async function GET(request: Request) {
                     cropHealthMap[cropName].count++;
                     detectedCrops.add(cropName);
 
-                    // Check Sentiment for this crop context
+                    // Check Sentiment
                     let localScore = 0;
                     POSITIVE_KEYWORDS.forEach(k => { if (text.includes(k)) localScore++; });
                     NEGATIVE_KEYWORDS.forEach(k => { if (text.includes(k)) localScore--; });
@@ -167,7 +177,7 @@ export async function GET(request: Request) {
                     Object.entries(SPECIFIC_ISSUES).forEach(([issueType, issueKeywords]) => {
                         issueKeywords.forEach(issue => {
                             if (text.includes(issue)) {
-                                cropHealthMap[cropName].issues.add(issue); // Add specific keyword found (e.g., "rust")
+                                cropHealthMap[cropName].issues.add(issue);
                             }
                         });
                     });
@@ -177,10 +187,8 @@ export async function GET(request: Request) {
 
         // Format Crop Health Data for Frontend
         const cropHealth = Object.entries(cropHealthMap)
-            .filter(([_, data]) => data.count > 0 || detectedCrops.has(_)) // Only send relevant crops
+            .filter(([_, data]) => data.count > 0 || detectedCrops.has(_))
             .map(([name, data]) => {
-                // Determine Risk Level
-                // High frequency of mentions + Negative sentiment = High Risk
                 let riskLevel = "Low";
                 const isNegative = data.sentiment < 0;
                 const hasIssues = data.issues.size > 0;
@@ -188,10 +196,8 @@ export async function GET(request: Request) {
                 if (hasIssues && isNegative) riskLevel = "High";
                 else if (hasIssues || isNegative) riskLevel = "Medium";
 
-                // Determine Trend
                 const yieldTrend = data.sentiment >= 0 ? "up" : "down";
 
-                // Top Issue (Capitalized)
                 const issueList = Array.from(data.issues);
                 const topIssue = issueList.length > 0
                     ? issueList[0].charAt(0).toUpperCase() + issueList[0].slice(1)
@@ -205,8 +211,8 @@ export async function GET(request: Request) {
                     volume: data.count
                 };
             })
-            .sort((a, b) => b.volume - a.volume) // Sort by relevance/volume
-            .slice(0, 5); // Take top 5
+            .sort((a, b) => b.volume - a.volume)
+            .slice(0, 5);
 
         const insight = feed.items[0]?.title || `No recent major headlines for ${country}.`;
 
@@ -217,17 +223,10 @@ export async function GET(request: Request) {
             trend: trends[0],
             insight,
             crops: Array.from(detectedCrops).slice(0, 5),
-            cropHealth: cropHealth.length > 0 ? cropHealth : null, // New Real-time Field
+            cropHealth: cropHealth.length > 0 ? cropHealth : null,
             aiNews: aiFeed.items.slice(0, 3).map(i => ({ title: i.title, link: i.link })),
             concerns: density,
-            weather: weather ? {
-                temp: weather.current_weather.temperature,
-                condition: weather.current_weather.weathercode,
-                dailyMin: weather.daily?.temperature_2m_min?.[0],
-                dailyMax: weather.daily?.temperature_2m_max?.[0],
-                precip: weather.daily?.precipitation_sum?.[0],
-                capital: coords.capitalName
-            } : null
+            weather // Now contains full WeatherAPI structure
         });
 
     } catch (error) {
